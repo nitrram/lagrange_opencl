@@ -60,7 +60,6 @@ int main( void ) {
 
   // Create and compile our GLSL program from the shaders
   GLuint programID = LoadShaders( "TransformVertexShader.vertexshader", "TextureFragmentShader.fragmentshader" );  
-  GLuint Texture = generate_texture(800,700);
 
   // Get a handle for our "myTextureSampler" uniform
   GLuint TextureID  = glGetUniformLocation(programID, "myTextureSampler");
@@ -69,24 +68,23 @@ int main( void ) {
   // A cube has 6 faces with 2 triangles each, so this makes 6*2=12 triangles, and 12*3 vertices
   static const GLfloat g_vertex_buffer_data[] = {
     -1.0f, -1.0f,
-    1.0f, -1.0f,
     -1.0f,  1.0f,
-    -1.0f,  1.0f,
-    1.0f, -1.0f,
-    1.0f,  1.0f
+     1.0f,  1.0f,
+     1.0f, -1.0f,
   };
 
-  GLuint vertexbuffer;
-  glGenBuffers(1, &vertexbuffer);
-  glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
+  GLfloat tex_coords[] = {0.0f, 0.0f,
+			  1.0f, 0.0f,
+			  0.0f, 1.0f,
+			  1.0f, 1.0f};
 
-  // Clear the screen
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  GLuint vertexbuffer[2];
+  glGenBuffers(2, vertexbuffer);
+  glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer[0]);
+  glBufferData(GL_ARRAY_BUFFER, 8*sizeof(GLfloat), g_vertex_buffer_data, GL_STATIC_DRAW);
 
   // 1rst attribute buffer : vertices
   glEnableVertexAttribArray(0);
-  glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
   glVertexAttribPointer(
 			0,                  // attribute. No particular reason for 0, but must match the layout in the shader.
 			2,                  // size
@@ -96,11 +94,19 @@ int main( void ) {
 			(void*)0            // array buffer offset
 			);
 
+  glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer[1]);
+  glBufferData(GL_ARRAY_BUFFER, 8*sizeof(GLfloat), tex_coords, GL_STATIC_DRAW);
+  glEnableVertexAttribArray(1);
+  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+  
+  GLuint Texture = generate_texture(800,700);
+
   // Use our shader
   glUseProgram(programID);
 
   // Draw the triangle !
-  glDrawArrays(GL_TRIANGLES, 0, 6); // 2*3 indices starting at 0 -> 2 triangles
+  glDrawArrays(GL_TRIANGLE_FAN, 0, 4); // 2*3 indices starting at 0 -> 2 triangles
 
   glDisableVertexAttribArray(0);
   glDisableVertexAttribArray(1);
@@ -117,7 +123,7 @@ int main( void ) {
 	 glfwWindowShouldClose(window) == 0 );
 
   // Cleanup VBO and shader
-  glDeleteBuffers(1, &vertexbuffer);
+  glDeleteBuffers(2, vertexbuffer);
   glDeleteProgram(programID);
   glDeleteTextures(1, &TextureID);
   glDeleteVertexArrays(1, &VertexArrayID);

@@ -63,7 +63,6 @@ static float *generate_net(size_t wdth){
     if(output[i] == 0) y++;
     output[i+1] = (float)y;            /* y */
     output[i+2] = (float)((rand() % 10) << 1);  /* z */
-    //    printf("i %d %d %d\n", output[i], output[i+1], output[i+2]);
   }
 
   
@@ -83,7 +82,7 @@ static cl_mem configure_shared_data(cl_context context, GLuint &pbo, size_t size
   glGenBuffers(1, &pbo);
   glBindBuffer(GL_ARRAY_BUFFER, pbo);
   glBufferData(GL_ARRAY_BUFFER, size*sizeof(unsigned char), NULL, GL_STATIC_DRAW);
-
+    
   cl_mem result = clCreateFromGLBuffer(context, CL_MEM_WRITE_ONLY, pbo, &err);
   if( err < 0 ){
     fprintf(stderr, "Could not create pixel buffer\n");
@@ -120,7 +119,6 @@ GLuint generate_texture(const size_t wdth, const size_t hght) {
   }
     
   printf("Num of devices: %d\n", num_devices);
-
 
   float *net = generate_net(wdth);
   
@@ -181,8 +179,7 @@ GLuint generate_texture(const size_t wdth, const size_t hght) {
   
   clSetKernelArg(kernel, 1, sizeof(cl_mem), &net_buffer);
   unsigned int dens_arg = DATA_DENSITY;
-  clSetKernelArg(kernel, 2, sizeof(unsigned int), &dens_arg);
-
+  clSetKernelArg(kernel, 2, sizeof(unsigned int), &dens_arg); 
 
   int flat_lang_size = 4*DATA_DENSITY;
   clSetKernelArg(kernel, 3, flat_lang_size * sizeof(float), NULL);
@@ -197,7 +194,7 @@ GLuint generate_texture(const size_t wdth, const size_t hght) {
   printf("[WxH]%dx%d\n", wdth, hght);
   
   cl_event kernel_event;  
-  size_t wrk_units[] = { wdth, hght };
+  size_t wrk_units[] = { wdth, hght };  
   
   err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, wrk_units, NULL, 0, NULL, &kernel_event);
   if( err < 0 ) {
@@ -214,6 +211,12 @@ GLuint generate_texture(const size_t wdth, const size_t hght) {
   clReleaseEvent(kernel_event);
 
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pixel_buffer);
+
+  // char *data = (char *)malloc(wdth*hght*4);
+  // memset(data, 0x90, wdth*hght*3);
+  // memset(data+(wdth*hght*3), 0xff, wdth*hght);
+
+  // last arg set to 0
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wdth, hght, 0, GL_BGRA, GL_UNSIGNED_BYTE, 0);
   glActiveTexture(GL_TEXTURE0);
 
@@ -221,10 +224,10 @@ GLuint generate_texture(const size_t wdth, const size_t hght) {
   glGenTextures(1, &textureID);
     
   // ... nice trilinear filtering.
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
+  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
   glGenerateMipmap(GL_TEXTURE_2D);
 
 
