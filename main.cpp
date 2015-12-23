@@ -73,10 +73,10 @@ int main( void ) {
      1.0f, -1.0f,
   };
 
-  GLfloat tex_coords[] = {0.0f, 0.0f,
-			  1.0f, 0.0f,
+  GLfloat tex_coords[] = {1.0f, 0.0f,
 			  0.0f, 1.0f,
-			  1.0f, 1.0f};
+			  1.0f, 1.0f,
+			  0.0f, 0.0f};
 
   GLuint vertexbuffer[2];
   glGenBuffers(2, vertexbuffer);

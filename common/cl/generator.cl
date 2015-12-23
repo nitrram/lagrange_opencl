@@ -21,7 +21,7 @@ float langrage_x(float var, __global float4 *ar, int density) {
 }
 
 
-float langrage_y(float var, __local float4 *ar, int density) {
+float langrage_y(float var, __global float4 *ar, int density) {
 
   int i,j;
   float li = 1;
@@ -69,7 +69,7 @@ uchar4 dist_colors(int z) {
 }
 
 
-__kernel void gen_texture(__global uchar4 *dst_buf, __global float4 *src_buf, int dens, __local float4 *temps) {
+__kernel void gen_texture(__global uchar4 *dst_buf, __global float4 *src_buf, int dens, __global float4 *temps) {
 
   int x = get_global_id(0);
   int y = get_global_id(1);
@@ -86,21 +86,16 @@ __kernel void gen_texture(__global uchar4 *dst_buf, __global float4 *src_buf, in
     net[idx] ~ src_buf+(idx*dens)
    */
 
-  barrier(CLK_LOCAL_MEM_FENCE);
+  //barrier(CLK_LOCAL_MEM_FENCE);
   
   int z = (int)langrage_y(y, temps, dens);
        
   /* z ~ [R|G|B] */
-  int offset = 0;
-  int yss = 0;
 
-  if(x < 100) {
-    offset =10;
-  } 
-  if(y < 100){
-    yss = 80;
-  }
+  //int r = 120;
+  int oi = x + (y*siz);
+  //if(y%2) r = 0;
   
-  dst_buf[x+(y*siz)] = (uchar4)(yss,offset,0,0);
+  dst_buf[oi] = (uchar4)(0,0,40,0);
 }
 

@@ -182,7 +182,9 @@ GLuint generate_texture(const size_t wdth, const size_t hght) {
   clSetKernelArg(kernel, 2, sizeof(unsigned int), &dens_arg); 
 
   int flat_lang_size = 4*DATA_DENSITY;
-  clSetKernelArg(kernel, 3, flat_lang_size * sizeof(float), NULL);
+  float *test = (float*)malloc(sizeof(float)*flat_lang_size);
+  cl_mem test_buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, flat_lang_size*sizeof(float), test, &err);
+  clSetKernelArg(kernel, 3, sizeof(cl_mem), &test_buffer);
   
   glFinish();
 
@@ -205,6 +207,12 @@ GLuint generate_texture(const size_t wdth, const size_t hght) {
   if( err < 0 ) {
     fprintf(stderr, "Could not wait for events\n");
   }
+
+
+  for(int i=0; i< flat_lang_size; i++) {
+    printf("%.1f ", test[i]);
+  }
+  printf("\n");
 
   clEnqueueReleaseGLObjects(queue, 1, &outbuf, 0, NULL, NULL);
   clFinish(queue);
