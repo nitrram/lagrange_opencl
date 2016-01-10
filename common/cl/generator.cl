@@ -1,26 +1,5 @@
 /* __constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE |CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST; */
 
-
-float langrage_x(float var, __global float4 *ar, int density) {
-
-  int i,j;
-  float li = 1;
-  float ln = 0;
-
-  for(i=0; i<density; i++){
-    for(j=0; j<density; j++){
-      if(i!=j){
-  	  li *= (var - ar[j].x) / (ar[i].x - ar[j].x);
-      }
-    }
-    ln += li*ar[i].z;    
-    li = 1;
-  }
-
-  return ln;  
-}
-
-
 float langrage_y(float var, __global float4 *ar, int density) {
 
   int i,j;
@@ -39,7 +18,6 @@ float langrage_y(float var, __global float4 *ar, int density) {
 
   return ln;  
 }
-
 
 uchar4 dist_colors(int z) {
   char r = 0, g = 0, b=1;
@@ -68,34 +46,56 @@ uchar4 dist_colors(int z) {
   return (uchar4)(r, g, b, 0);
 }
 
+float langrage_x(float var, __global float4 *ar, int density) {
 
-__kernel void gen_texture(__global uchar4 *dst_buf, __global float4 *src_buf, int dens, __global float4 *temps) {
+  int i,j;
+  float li = 1;
+  float ln = 0;
+
+  for(i=0; i<density; i++){
+    for(j=0; j<density; j++){
+      if(i!=j){
+  	  li *= (var - ar[j].x) / (ar[i].x - ar[j].x);
+      }
+    }
+    ln += li*ar[i].z;    
+    li = 1;
+  }
+
+  return ln;  
+}
+
+__kernel void dim_x(__global float4 *src_buf,
+		    __global float4 *dst_buf,
+		    int dens) {
+  
+  int x = get_global_id(0);
+  
+  int siz = get_global_size(0);
+  
+  int offset = x * dens;
+  for(int idx=0; idx<dens; idx++) {
+    dst_buf[offset+idx] = (float4)(x,
+				   src_buf[idx*dens].y,
+				   langrage_x(x, src_buf+(idx*dens), dens),
+				   0.0);
+  }
+}
+
+__kernel void dim_xy(__global float4 *lang_x_buf,
+		     __global uchar4 *dst_buf,
+		     int dens) {
 
   int x = get_global_id(0);
   int y = get_global_id(1);
 
   int siz = get_global_size(0);
-  
-  for(int idx=0; idx<dens; idx++){
-    temps[idx] = (float4)(x, src_buf[idx*dens].y, langrage_x(x, src_buf+(idx*dens), dens), 0.0);
-  }
-
-  /*
-    x, y
-    net[idx][0].y ~ src_buf[idx*dens + 0].y
-    net[idx] ~ src_buf+(idx*dens)
-   */
-
-  //barrier(CLK_LOCAL_MEM_FENCE);
-  
-  int z = (int)langrage_y(y, temps, dens);
+    
+  int z = (int)langrage_y(y, lang_x_buf+(x*dens), dens);
        
   /* z ~ [R|G|B] */
 
-  //int r = 120;
-  int oi = x + (y*siz);
-  //if(y%2) r = 0;
-  
-  dst_buf[oi] = (uchar4)(0,0,40,0);
+  int oi = x + (y*siz);  
+  dst_buf[oi] = dist_colors(z); //(uchar4)(0,0,r,0);
 }
 

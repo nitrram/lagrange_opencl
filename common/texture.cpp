@@ -15,9 +15,50 @@
 
 #define DATA_DENSITY 16
 
-static const char * _path = "common/cl/generator.cl";
+static const char *_path = "common/cl/generator.cl";
 
-static cl_program fetch_program(cl_context context, const char *path) {
+typedef struct {
+  cl_device_id device;
+  cl_platform_id platform;
+} device_platform_t;
+
+static device_platform_t create_device() {
+
+  cl_int err;
+  cl_uint num_platforms;
+  err = clGetPlatformIDs(0, NULL, &num_platforms);
+  if (err != CL_SUCCESS) {
+    fprintf(stderr, "Cannot get the number of OpenCL platforms available.\n");
+    exit(EXIT_FAILURE);
+  }
+
+  printf("Num of platforms: %d\n", (int)num_platforms);
+  cl_platform_id platforms[num_platforms];
+  err = clGetPlatformIDs(num_platforms, platforms, NULL);
+  if (err != CL_SUCCESS) {
+    fprintf(stderr, "Cannot get  platform ids.\n");
+    exit(EXIT_FAILURE);
+  }
+ 
+  cl_uint num_devices;
+  err = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_GPU, 1, NULL, &num_devices);
+  if(err != CL_SUCCESS) {
+    fprintf(stderr, "Cannot find any GPU device.\n");
+    exit(EXIT_FAILURE);
+  }
+    
+  printf("Num of devices: %d\n", num_devices);
+  
+  cl_device_id device;
+  err = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_GPU, 1, &device, NULL);
+  if(err < 0) {
+    err = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_CPU, 1, &device, NULL);
+  }
+
+  return device_platform_t{device, platforms[0]};  
+}
+
+static cl_program build_program(cl_context context, cl_device_id device, const char *path) {
 
   FILE* program_handle;
   char *program_buffer, *program_log;
@@ -37,13 +78,26 @@ static cl_program fetch_program(cl_context context, const char *path) {
 
   cl_program program;
   program = clCreateProgramWithSource(context, 1, (const char **)&program_buffer, &program_size, &err);
+  if(err < 0) {
+    fprintf(stderr, "error creating program from source: %d", err);
+  }
 
-  printf("cl_err: %d\n", err);
+  err = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
+  if(err < 0) {
+    /* Find size of log and print to std output */
+    clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG,
+			  0, NULL, &log_size);
+    program_log = (char*) malloc(log_size + 1);
+    program_log[log_size] = '\0';
+    clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG,
+			  log_size + 1, program_log, NULL);
+    printf("%s\n", program_log);
+    free(program_log);  
+  }    
 
   free(program_buffer);
   return program;
 }
-
 
 static float *generate_net(size_t wdth){
 
@@ -53,18 +107,24 @@ static float *generate_net(size_t wdth){
   uint32_t x,y,n;
   int i;
 
-  srand((unsigned)time(0));
-      
+  srand((unsigned)time(0));      
   n = wdth / DATA_DENSITY;
 
-  //  printf("gen_net: %d [%d] ~ %d (%d)\n", n, i, x, sizeof(uint32_t) * 4 * DATA_DENSITY * DATA_DENSITY + 1);
+  //printf("gen_net: %d [%d] ~ %d (%d)\n", n, i, x, sizeof(uint32_t) * 4 * DATA_DENSITY * DATA_DENSITY + 1);
   for(x = 0, y = -1, i = 0; i < net_len; x+=n, i+=4) {
     output[i] = (float)(x % wdth);       /* x */
-    if(output[i] == 0) y++;
+    if(output[i] == 0) {
+      if(i != 0) {
+	printf("[%d]\n", y);
+      } 
+      y++;      
+    }
     output[i+1] = (float)y;            /* y */
-    output[i+2] = (float)((rand() % 10) << 1);  /* z */
-  }
+    output[i+2] = (float)((rand() % 10) << ((rand() % 2) ? 1 : 0));  /* z */
 
+    printf("%4.1f ", output[i+2]);
+  }
+  printf("[%d]\n", y);
   
   return output;
 }
@@ -91,132 +151,124 @@ static cl_mem configure_shared_data(cl_context context, GLuint &pbo, size_t size
   return result;
 }
 
+GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
 
-GLuint generate_texture(const size_t wdth, const size_t hght) {
+  cl_int err;
 
-  cl_int status;
-  cl_uint num_platforms;
-  status = clGetPlatformIDs(0, NULL, &num_platforms);
-  if (status != CL_SUCCESS) {
-    fprintf(stderr, "Cannot get the number of OpenCL platforms available.\n");
-    exit(EXIT_FAILURE);
-  }
+  device_platform_t dev_plat = create_device();
 
-  printf("num of platforms: %d\n", (int)num_platforms);
-  cl_platform_id platforms[num_platforms];
-  status = clGetPlatformIDs(num_platforms, platforms, NULL);
-  if (status != CL_SUCCESS) {
-    fprintf(stderr, "Cannot get  platform ids.\n");
-    exit(EXIT_FAILURE);
-  }
+  cl_device_id device = dev_plat.device;  
 
-  
-  cl_uint num_devices;
-  status = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_GPU, 1, NULL, &num_devices);
-  if(status != CL_SUCCESS) {
-    fprintf(stderr, "Cannot find any GPU device.\n");
-    exit(EXIT_FAILURE);
-  }
-    
-  printf("Num of devices: %d\n", num_devices);
-
-  float *net = generate_net(wdth);
-  
-  cl_device_id device;
-  clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_GPU, 1, &device, NULL);
-
-  cl_context_properties properties[] = {
+  cl_context_properties context_properties[] = {
     CL_GL_CONTEXT_KHR, (cl_context_properties) glXGetCurrentContext(),
     CL_GLX_DISPLAY_KHR, (cl_context_properties) glXGetCurrentDisplay(),
-    CL_CONTEXT_PLATFORM, (cl_context_properties) platforms[0],
+    CL_CONTEXT_PLATFORM, (cl_context_properties) dev_plat.platform,
     0};
   
-  cl_int err;
-  cl_context context;
-  context = clCreateContext(properties, 1, &device, NULL, NULL, &err);
+  cl_context context = clCreateContext(context_properties, 1, &device, NULL, NULL, &err);
   if( err < 0 ) {
     fprintf(stderr, "Could not create context\n");
   }
 
+  float *net = generate_net(wdth);
+  // for(int i=0;i<wdth*hght;i+=4) {
+  //   if(!(i%wdth)) {
+  //     printf("\n");
+  //   }
+  //   printf("%.1f ", net[i]);    
+  // }
+  
+
   size_t log_size;
-  cl_program program = fetch_program(context, _path);
-  err = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
-  if(err < 0) {
-    /* Find size of log and print to std output */
-    clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG,
-			  0, NULL, &log_size);
-    char *program_log = (char*) malloc(log_size + 1);
-    program_log[log_size] = '\0';
-    clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG,
-			  log_size + 1, program_log, NULL);
-    printf("%s\n", program_log);
-    free(program_log);  
+  cl_program program = build_program(context, device, _path);  
+      
+  unsigned int size_r = wdth*hght;
+  unsigned int size = size_r*4;
+
+  unsigned int dens_arg = DATA_DENSITY;
+  size_t tmp_siz = sizeof(float) * 4 * DATA_DENSITY * wdth;
+  float *ftmp = (float*)malloc(tmp_siz);
+  cl_mem tmp_buf = clCreateBuffer(context, CL_MEM_READ_WRITE, tmp_siz, ftmp, &err);
+  if( err < 0 ) {
+    fprintf(stderr, "Could not create buffer of the tmp_buf\n");
   }
-    
-  cl_kernel kernel;
-  kernel = clCreateKernel(program, "gen_texture", &err);
+
+  cl_kernel dim_xy, dim_x;
+  dim_x = clCreateKernel(program, "dim_x", &err);
+  if( err < 0 ) {
+    fprintf(stderr, "Could not create kernel dim1\n");
+  }
+
+  cl_mem net_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, 4*DATA_DENSITY*DATA_DENSITY*sizeof(float), net, &err);
+  if( err < 0 ) {
+    fprintf(stderr, "Could not create buffer of the net\n");
+  } 
+  clSetKernelArg(dim_x, 0, sizeof(cl_mem), &net_buffer);
+  clSetKernelArg(dim_x, 1, sizeof(cl_mem), &tmp_buf);
+  clSetKernelArg(dim_x, 2, sizeof(unsigned int), &dens_arg);
+  
+
+  dim_xy = clCreateKernel(program, "dim_xy", &err);
   if( err < 0 ) {
     fprintf(stderr, "Could not create kernel\n");
   }
-
-  cl_command_queue queue;
-  queue = clCreateCommandQueue(context, device, 0, &err);
-  if( err < 0 ) {
-    fprintf(stderr, "Could not create queue\n");
-  }
-
-  unsigned int size_r = wdth*hght;
-  unsigned int size = size_r*4;
   
   GLuint pixel_buffer;
   cl_mem outbuf = configure_shared_data(context, pixel_buffer, size);   
-  clSetKernelArg(kernel, 0, sizeof(cl_mem), &outbuf);
+  clSetKernelArg(dim_xy, 0, sizeof(cl_mem), &tmp_buf);    
+  clSetKernelArg(dim_xy, 1, sizeof(cl_mem), &outbuf);
+  clSetKernelArg(dim_xy, 2, sizeof(unsigned int), &dens_arg);  
 
-  cl_mem net_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(net), net, &err);
+  
+  cl_command_queue queue = clCreateCommandQueue(context, device, 0, &err);
   if( err < 0 ) {
-    fprintf(stderr, "Could not create buffer of the net\n");
+    fprintf(stderr, "Could not create queue\n");
   }
-  
-  clSetKernelArg(kernel, 1, sizeof(cl_mem), &net_buffer);
-  unsigned int dens_arg = DATA_DENSITY;
-  clSetKernelArg(kernel, 2, sizeof(unsigned int), &dens_arg); 
+  printf("tmp_x: %d\n", (int)tmp_siz);
 
-  int flat_lang_size = 4*DATA_DENSITY;
-  float *test = (float*)malloc(sizeof(float)*flat_lang_size);
-  cl_mem test_buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, flat_lang_size*sizeof(float), test, &err);
-  clSetKernelArg(kernel, 3, sizeof(cl_mem), &test_buffer);
-  
   glFinish();
 
   err = clEnqueueAcquireGLObjects(queue, 1, &outbuf, 0, NULL, NULL);
   if( err < 0 ) {
     fprintf(stderr, "Could not acquire GL objects\n");
   }
-  
   printf("[WxH]%dx%d\n", wdth, hght);
   
-  cl_event kernel_event;  
-  size_t wrk_units[] = { wdth, hght };  
+  cl_event dim_xy_event, dim_x_event;  
+  size_t wrk_units[] = { wdth, hght };
+  const size_t dim = (size_t)wdth;
   
-  err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, wrk_units, NULL, 0, NULL, &kernel_event);
+  err = clEnqueueNDRangeKernel(queue, dim_x, 1, NULL, &dim, NULL, 0, NULL, &dim_x_event);
   if( err < 0 ) {
-    fprintf(stderr, "Could not enqueue kernel\n");    
+    fprintf(stderr, "Could not enqueue kernel dim1: %d\n", err);    
   }
 
-  err = clWaitForEvents(1, &kernel_event);
+  // float* test = (float*)malloc(tmp_siz);
+  // printf("testing reading buffer of size: %d\n", tmp_siz);
+  // err =  clEnqueueReadBuffer(queue, tmp_buf, CL_TRUE, 0, tmp_siz, test, 0, NULL, NULL);
+  // if(err < 0) {
+  //     fprintf(stderr, "Could not enqueue reading inter: %d\n", err);    
+  // }
+  // printf("carry %d\n", clEnqueueBarrier(queue));  
+  // for(int i=0; i< 4 * wdth; i++) {
+  //   printf("%.1f ", test[i]);
+  // }
+  // printf("\n");
+      
+  err = clEnqueueNDRangeKernel(queue, dim_xy, 2, NULL, wrk_units, NULL, 1, &dim_x_event, &dim_xy_event);
+  if( err < 0 ) {
+     fprintf(stderr, "Could not enqueue kernel: %d\n", err);    
+  }
+  
+  err = clWaitForEvents(1, &dim_xy_event);
   if( err < 0 ) {
     fprintf(stderr, "Could not wait for events\n");
   }
-
-
-  for(int i=0; i< flat_lang_size; i++) {
-    printf("%.1f ", test[i]);
-  }
-  printf("\n");
-
+  
   clEnqueueReleaseGLObjects(queue, 1, &outbuf, 0, NULL, NULL);
   clFinish(queue);
-  clReleaseEvent(kernel_event);
+  clReleaseEvent(dim_xy_event);
+  clReleaseEvent(dim_x_event);
 
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pixel_buffer);
 
@@ -232,15 +284,17 @@ GLuint generate_texture(const size_t wdth, const size_t hght) {
   glGenTextures(1, &textureID);
     
   // ... nice trilinear filtering.
-  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
   glGenerateMipmap(GL_TEXTURE_2D);
 
 
+  clReleaseMemObject(tmp_buf);
   clReleaseMemObject(outbuf);
-  clReleaseKernel(kernel);
+  clReleaseKernel(dim_xy);
+  clReleaseKernel(dim_x);
   clReleaseCommandQueue(queue);
   clReleaseProgram(program);
   clReleaseContext(context);

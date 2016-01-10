@@ -5,7 +5,7 @@
 GLuint loadBMP_custom(const char * imagepath);
 
 
-GLuint generate_texture(const size_t wdth, const size_t hght);
+GLuint generate_texture(const uint32_t wdth, const uint32_t hght);
 
 //// Since GLFW 3, glfwLoadTexture2D() has been removed. You have to use another texture loading library, 
 //// or do it yourself (just like loadBMP_custom and loadDDS)
