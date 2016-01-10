@@ -74,8 +74,8 @@ int main( void ) {
   };
 
   GLfloat tex_coords[] = {1.0f, 0.0f,
-			  0.0f, 1.0f,
 			  1.0f, 1.0f,
+			  0.0f, 1.0f,
 			  0.0f, 0.0f};
 
   GLuint vertexbuffer[2];
@@ -106,7 +106,7 @@ int main( void ) {
   glUseProgram(programID);
 
   // Draw the triangle !
-  glDrawArrays(GL_TRIANGLE_FAN, 0, 4); // 2*3 indices starting at 0 -> 2 triangles
+  glDrawArrays(GL_TRIANGLE_FAN, 0, 4); // 2*2 indices starting at 0 -> 2 triangles
 
   glDisableVertexAttribArray(0);
   glDisableVertexAttribArray(1);

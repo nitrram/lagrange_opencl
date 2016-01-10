@@ -20,28 +20,28 @@ float langrage_y(float var, __global float4 *ar, int density) {
 }
 
 uchar4 dist_colors(int z) {
-  char r = 0, g = 0, b=1;
-  char c = 5; /*coefficient belonging to a colour 10 / 4*/
+  char r = 0, g = 0, b=0;
+  float c = 12.5f; /*coefficient belonging to a colour 10 / 4*/
+  int z1 = z + 32;
   
-  if(z < c){
-    g=(char)z;
+  if(z1 < c){
+    b=(char)z1;
   }
-  else if ((z >= c) && (z < 2*c)){
-    b = 255;
+  else if ((z1 >= c) && (z1 < 3*c)){    
     g = 255;
-    b-=((char)z-c);
+    b=255-((char)z1-c);
   }
-  else if ((z >= 2*c) && (z < 3*c)){
+  else if ((z1 >= 3*c) && (z1 < 5*c)){
     b = 0;
     g = 255;
-    r=((char)z-2*c);
+    r=((char)z1-3*c);
   }
-  else if(z >= 3*c){
+  else if(z1 >= 5*c){
     b = 0;
     g = 255;
     r = 255;  
-    g-=((char)z-3*c);
-  }
+    g-=((char)z1-5*c);
+  } 
   
   return (uchar4)(r, g, b, 0);
 }
@@ -75,9 +75,9 @@ __kernel void dim_x(__global float4 *src_buf,
   
   int offset = x * dens;
   for(int idx=0; idx<dens; idx++) {
-    dst_buf[offset+idx] = (float4)(x,
+    dst_buf[offset+idx] = (float4)((float)x,
 				   src_buf[idx*dens].y,
-				   langrage_x(x, src_buf+(idx*dens), dens),
+				   langrage_x((float)x, src_buf+(idx*dens), dens),
 				   0.0);
   }
 }
@@ -95,7 +95,10 @@ __kernel void dim_xy(__global float4 *lang_x_buf,
        
   /* z ~ [R|G|B] */
 
-  int oi = x + (y*siz);  
+  int oi = x + (y*siz);
+
+  //  int r = (y%8 && x%8) ? 0 : 120;
+  
   dst_buf[oi] = dist_colors(z); //(uchar4)(0,0,r,0);
 }
 

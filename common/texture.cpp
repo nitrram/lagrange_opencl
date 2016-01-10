@@ -13,7 +13,7 @@
 
 #include <time.h>
 
-#define DATA_DENSITY 16
+#define DATA_DENSITY 8
 
 static const char *_path = "common/cl/generator.cl";
 
@@ -111,20 +111,20 @@ static float *generate_net(size_t wdth){
   n = wdth / DATA_DENSITY;
 
   //printf("gen_net: %d [%d] ~ %d (%d)\n", n, i, x, sizeof(uint32_t) * 4 * DATA_DENSITY * DATA_DENSITY + 1);
-  for(x = 0, y = -1, i = 0; i < net_len; x+=n, i+=4) {
+  for(x = 0, y = 0, i = 0; i < net_len; x+=n, i+=4) {
     output[i] = (float)(x % wdth);       /* x */
     if(output[i] == 0) {
       if(i != 0) {
-	printf("[%d]\n", y);
+	printf("\n");
+	y+=n;      
       } 
-      y++;      
     }
     output[i+1] = (float)y;            /* y */
-    output[i+2] = (float)((rand() % 10) << ((rand() % 2) ? 1 : 0));  /* z */
+    output[i+2] = (float)((rand() % 200)); // << ((rand() % 2) ? 1 : 0));  /* z */
 
-    printf("%4.1f ", output[i+2]);
+    printf("[%3d %3d %4.1f] ", x%wdth, y, output[i+2]);
   }
-  printf("[%d]\n", y);
+  printf("\n");
   
   return output;
 }
@@ -171,12 +171,11 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   }
 
   float *net = generate_net(wdth);
-  // for(int i=0;i<wdth*hght;i+=4) {
-  //   if(!(i%wdth)) {
-  //     printf("\n");
-  //   }
-  //   printf("%.1f ", net[i]);    
+  // for(int i=0; i < DATA_DENSITY*4*DATA_DENSITY; i+=4) {
+  //   printf("%7.1f ", net[i+1]);
   // }
+  // printf("\n");
+
   
 
   size_t log_size;
@@ -206,8 +205,7 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   clSetKernelArg(dim_x, 0, sizeof(cl_mem), &net_buffer);
   clSetKernelArg(dim_x, 1, sizeof(cl_mem), &tmp_buf);
   clSetKernelArg(dim_x, 2, sizeof(unsigned int), &dens_arg);
-  
-
+    
   dim_xy = clCreateKernel(program, "dim_xy", &err);
   if( err < 0 ) {
     fprintf(stderr, "Could not create kernel\n");
@@ -243,17 +241,18 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
     fprintf(stderr, "Could not enqueue kernel dim1: %d\n", err);    
   }
 
-  // float* test = (float*)malloc(tmp_siz);
-  // printf("testing reading buffer of size: %d\n", tmp_siz);
-  // err =  clEnqueueReadBuffer(queue, tmp_buf, CL_TRUE, 0, tmp_siz, test, 0, NULL, NULL);
-  // if(err < 0) {
-  //     fprintf(stderr, "Could not enqueue reading inter: %d\n", err);    
-  // }
-  // printf("carry %d\n", clEnqueueBarrier(queue));  
-  // for(int i=0; i< 4 * wdth; i++) {
-  //   printf("%.1f ", test[i]);
-  // }
-  // printf("\n");
+  float* test = (float*)malloc(tmp_siz);
+  printf("testing reading buffer of size: %d\n", tmp_siz);
+  err =  clEnqueueReadBuffer(queue, tmp_buf, CL_TRUE, 0, tmp_siz, test, 0, NULL, NULL);
+  if(err < 0) {
+      fprintf(stderr, "Could not enqueue reading inter: %d\n", err);    
+  }
+  printf("carry %d\n", clEnqueueBarrier(queue));
+  for(int i=0; i< 32; i+=4) {
+    printf("%7.1f ", test[i+1]);
+  }
+  printf("\n");
+
       
   err = clEnqueueNDRangeKernel(queue, dim_xy, 2, NULL, wrk_units, NULL, 1, &dim_x_event, &dim_xy_event);
   if( err < 0 ) {
@@ -269,6 +268,14 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   clFinish(queue);
   clReleaseEvent(dim_xy_event);
   clReleaseEvent(dim_x_event);
+
+
+  // printf("hurray\n");
+  // for(int i=0; i< 2561; i+=4) {
+  //   printf("%7.1f ", pixel_buffer[i+2]);
+  // }
+  // printf("\n");
+
 
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pixel_buffer);
 
