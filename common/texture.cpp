@@ -245,25 +245,32 @@ void update_texture() {
     fprintf(stderr, "Could not wait for events\n");
   }
 
-  clEnqueueBarrier(_queue);
-  unsigned char *test = (unsigned char*)malloc(_size);
-  printf("testing reading buffer of size: %d\n", _size);
-  err =  clEnqueueReadBuffer(_queue, _pixel_buf, CL_TRUE, 0, _size, test, 0, NULL, NULL);
-  if(err < 0) {
-    fprintf(stderr, "Could not enqueue reading inter: %d\n", err);    
-  }  
-  //  printf("carry %d\n", clEnqueueBarrier(_queue));
-  for(int i=10024; i<10024+48 ; i+=4) {
-    printf("[%3d %3d %3d]\n", test[i], test[i+1], test[i+2]);
-  }
-  printf("\n");
+  // clEnqueueBarrier(_queue);
+  // unsigned char *test = (unsigned char*)malloc(_size);
+  // printf("testing reading buffer of size: %d\n", _size);
+  // err =  clEnqueueReadBuffer(_queue, _pixel_buf, CL_TRUE, 0, _size, test, 0, NULL, NULL);
+  // if(err < 0) {
+  //   fprintf(stderr, "Could not enqueue reading inter: %d\n", err);    
+  // }  
+  // //  printf("carry %d\n", clEnqueueBarrier(_queue));
+  // for(int i=10024; i<10024+48 ; i+=4) {
+  //   printf("[%3d %3d %3d]\n", test[i], test[i+1], test[i+2]);
+  // }
+  // printf("\n");
 
 
   clEnqueueReleaseGLObjects(_queue, 1, &_pixel_buf, 0, NULL, NULL);
 
   clFinish(_queue);
   clReleaseEvent(dim_xy_event);
-  clReleaseEvent(dim_x_event);  
+  clReleaseEvent(dim_x_event);
+
+
+  glBindBuffer(GL_PIXEL_UNPACK_BUFFER, _pixel_gl);
+
+  // last arg set to 0
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, _wdth, _hght, 0, GL_BGRA, GL_UNSIGNED_BYTE, 0);
+  glActiveTexture(GL_TEXTURE0);
 }
 
 void free_texture() {  

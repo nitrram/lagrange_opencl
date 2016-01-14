@@ -11,6 +11,8 @@
 #include <GLFW/glfw3.h>
 GLFWwindow* window;
 
+#include <time.h>
+
 // Include GLM
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -21,6 +23,13 @@ using namespace glm;
 
 #define WIDTH 1024
 #define HEIGHT 768
+
+
+static double now_ms() {
+  struct timespec res;
+  clock_gettime(CLOCK_REALTIME, &res);
+  return 1000.0*res.tv_sec + (double)res.tv_nsec/1e6;
+}
 
 int main( void ) {
   // Initialise GLFW
@@ -100,31 +109,28 @@ int main( void ) {
   glEnableVertexAttribArray(1);
   glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
+
+  // Use our shader
+  glLinkProgram(programID);
+  glUseProgram(programID);    
+    
   generate_texture(800,700);
-   
+
+  double time_now;
+  double time_diff;
   /* main loop */
   do{
-
-    glClear(GL_COLOR_BUFFER_BIT |GL_DEPTH_BUFFER_BIT);   
-    
-    update_texture();
-
-    glBindVertexArray(VertexArrayID);    
-    
-    glMemoryBarrier(GL_ALL_BARRIER_BITS);
-    // Use our shader
-    glUseProgram(programID);    
+    time_now = now_ms();
+    update_texture();    
       
     // Draw the triangle !
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4); // 2*2 indices starting at 0 -> 2 triangles
-
-    //glFinish();
-    glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-    glBindVertexArray(0);
     
     // Swap buffers
     glfwSwapBuffers(window);
+
+    time_diff = now_ms() - time_now;
+    printf("fps: %.2f\n", (float)1000/time_diff);
     
     glfwPollEvents();
   } // Check if the ESC key was pressed or the window was closed
