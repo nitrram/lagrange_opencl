@@ -81,7 +81,8 @@ int main( void ) {
   GLuint vertexbuffer[2];
   glGenBuffers(2, vertexbuffer);
   glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer[0]);
-  glBufferData(GL_ARRAY_BUFFER, 8*sizeof(GLfloat), g_vertex_buffer_data, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, 8*sizeof(GLfloat), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
+
 
   // 1rst attribute buffer : vertices
   glEnableVertexAttribArray(0);
@@ -93,35 +94,50 @@ int main( void ) {
 			0,                  // stride
 			(void*)0            // array buffer offset
 			);
-
+  
   glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer[1]);
-  glBufferData(GL_ARRAY_BUFFER, 8*sizeof(GLfloat), tex_coords, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, 8*sizeof(GLfloat), tex_coords, GL_DYNAMIC_DRAW);
   glEnableVertexAttribArray(1);
   glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
-  
-  GLuint Texture = generate_texture(800,700);
-
-  // Use our shader
-  glUseProgram(programID);
-
-  // Draw the triangle !
-  glDrawArrays(GL_TRIANGLE_FAN, 0, 4); // 2*2 indices starting at 0 -> 2 triangles
-
-  glDisableVertexAttribArray(0);
-  glDisableVertexAttribArray(1);
-
-  // Swap buffers
-  glfwSwapBuffers(window);
-
+  generate_texture(800,700);
+   
   /* main loop */
   do{
+
+    glClear(GL_COLOR_BUFFER_BIT |GL_DEPTH_BUFFER_BIT);   
+    
+    update_texture();
+
+    glBindVertexArray(VertexArrayID);    
+    
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    // Use our shader
+    glUseProgram(programID);    
+      
+    // Draw the triangle !
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4); // 2*2 indices starting at 0 -> 2 triangles
+
+    //glFinish();
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+    glBindVertexArray(0);
+    
+    // Swap buffers
+    glfwSwapBuffers(window);
+    
     glfwPollEvents();
   } // Check if the ESC key was pressed or the window was closed
   while( ((glfwGetKey(window, GLFW_KEY_ESCAPE ) != GLFW_PRESS) &&
 	  (glfwGetKey(window, GLFW_KEY_Q) != GLFW_PRESS)) &&
 	 glfwWindowShouldClose(window) == 0 );
 
+
+  free_texture();
+
+  glDisableVertexAttribArray(0);
+  glDisableVertexAttribArray(1);
+  
   // Cleanup VBO and shader
   glDeleteBuffers(2, vertexbuffer);
   glDeleteProgram(programID);

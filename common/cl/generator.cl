@@ -19,10 +19,13 @@ float langrage_y(float var, __global float4 *ar, int density) {
   return ln;  
 }
 
+
+/* 0 0 0; 255 0 0; 255 255 0; 255 255 255*/
+
 uchar4 dist_colors(int z) {
   char r = 0, g = 0, b=0;
   float c = 12.5f; /*coefficient belonging to a colour 10 / 4*/
-  int z1 = z + 32;
+  int z1 = z + 12;
   
   if(z1 < c){
     b=(char)z1;
