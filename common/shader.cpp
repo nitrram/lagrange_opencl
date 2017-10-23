@@ -10,6 +10,11 @@ using namespace std;
 #include <string.h>
 
 #include <GL/glew.h>
+#if defined(__APPLE__) || defined(MACOSX)
+#include <OpenGL/gl.h>
+#else
+#include <GL/gl.h>
+#endif
 
 #include "shader.hpp"
 

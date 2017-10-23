@@ -2,25 +2,45 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+
+#include <GL/glew.h>
+#if defined(__APPLE__) || defined(MACOSX)
+#include <OpenCL/cl.h>
+#include <OpenCL/cl_gl.h>
+#include <OpenCL/opencl.h>
+//#include <OpenGL/gl.h>
+#include <OpenGL/OpenGL.h>
+#include <GLUT/glut.h>
+
+#else
+
 #include <CL/cl.h>
 #include <CL/cl_gl.h>
-#include <GL/glew.h>
 #include <GL/glx.h>
 #include <GL/gl.h>
 #include <GL/freeglut.h>
-
 #include <GLFW/glfw3.h>
+#endif
+
+
+#if defined (__APPLE__) || defined(MACOSX)
+   #define GL_SHARING_EXTENSION "cl_APPLE_gl_sharing"
+#else
+   #define GL_SHARING_EXTENSION "cl_khr_gl_sharing"
+#endif
 
 #include <time.h>
+
+#include <iostream>
 
 #define DATA_DENSITY 8
 
 static const char *_path = "common/cl/generator.cl";
 
-typedef struct {
+struct device_platform_t {
   cl_device_id device;
   cl_platform_id platform;
-} device_platform_t;
+};
 
 static device_platform_t create_device() {
 
@@ -55,7 +75,7 @@ static device_platform_t create_device() {
     err = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_CPU, 1, &device, NULL);
   }
 
-  return device_platform_t{device, platforms[0]};  
+  return { device, platforms[0] };  
 }
 
 static cl_program build_program(cl_context context, cl_device_id device, const char *path) {
@@ -184,7 +204,7 @@ void update_texture() {
   cl_int err;
   cl_event dim_xy_event, dim_x_event;
 
-  size_t wrk_units[] = { _wdth, _hght };
+  size_t wrk_units[] = { static_cast<size_t>(_wdth), static_cast<size_t>(_hght) };
   size_t wrk_unit_wdth = (size_t)_wdth;
     
   float *net_modified = (float *)clEnqueueMapBuffer(_queue, _net_buf, CL_TRUE, CL_MAP_WRITE, 0, _net_len*4, 0, NULL, NULL, &err);
@@ -296,10 +316,17 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   _device = dev_plat.device;  
 
   cl_context_properties context_properties[] = {
+#ifdef __APPLE__
+	  CL_CONTEXT_PROPERTY_USE_CGL_SHAREGROUP_APPLE,
+	  (cl_context_properties)CGLGetShareGroup(CGLGetCurrentContext()), 
+	  0 
+#else
     CL_GL_CONTEXT_KHR, (cl_context_properties) glXGetCurrentContext(),
     CL_GLX_DISPLAY_KHR, (cl_context_properties) glXGetCurrentDisplay(),
     CL_CONTEXT_PLATFORM, (cl_context_properties) dev_plat.platform,
-    0};
+    0
+#endif
+  };
   
   _context = clCreateContext(context_properties, 1, &_device, NULL, NULL, &err);
   if( err < 0 ) {
@@ -319,9 +346,43 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   _dens_arg = DATA_DENSITY;
   _dim_x_siz = sizeof(float) * 4 * DATA_DENSITY * wdth;
   _dim_x = (float*)malloc(_dim_x_siz);
-  _dim_x_buf = clCreateBuffer(_context, CL_MEM_READ_WRITE, _dim_x_siz, _dim_x, &err);
+  _dim_x_buf = clCreateBuffer(_context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, _dim_x_siz, _dim_x, &err);
   if( err < 0 ) {
-    fprintf(stderr, "Could not create buffer of the tmp_buf\n");
+
+	  std::string err_str;
+	  switch(err) {
+		  case CL_INVALID_CONTEXT: {
+			  err_str = "invalid context";
+			  break;
+		  }
+		  case CL_INVALID_VALUE: {
+			  err_str = "invalid value";
+			  break;
+		  }
+		  case CL_INVALID_BUFFER_SIZE: {
+			  err_str = "invalid buffer size";
+			  break;
+		  }
+		  case CL_INVALID_HOST_PTR: {
+			  err_str = "invalid host pointer";
+			  break;
+		  }
+		  case CL_MEM_OBJECT_ALLOCATION_FAILURE: {
+			  err_str = "memory allocation failure";
+			  break;
+		  }
+		  case CL_OUT_OF_RESOURCES: {
+			  err_str = "out of resources";
+			  break;
+		  }
+		  case CL_OUT_OF_HOST_MEMORY: {
+			  err_str = "out host memory";
+			  break;
+		  }
+	  }
+
+	  
+	  fprintf(stderr, "Could not create buffer of the tmp_buf %s\n", err_str.c_str());
   }
   
   _dim_x_kernel = clCreateKernel(_program, "dim_x", &err);

@@ -1,25 +1,38 @@
-// Include standard headers
-#include <stdio.h>
-#include <stdlib.h>
-
-#include <CL/cl.h>
+///
+/// GNU/GPL3
+///
 
 // Include GLEW
 #include <GL/glew.h>
 
+#include "common/shader.hpp"
+#include "common/texture.hpp"
+
+
+// Include standard headers
+#include <stdio.h>
+#include <stdlib.h>
+
+#if defined(__APPLE__) || defined(MACOSX)
+
+#include <OpenCL/cl.h>
+#include <OpenGL/gl3.h>
+
+#define GLFW_INCLUDE_GL3  /* don't drag in legacy GL headers. */
+#define GLFW_NO_GLU       /* don't drag in the old GLU lib - unless you must. */
+
+#else
+
+#include <CL/cl.h>
+
+#endif
+
 // Include GLFW
 #include <GLFW/glfw3.h>
+
 GLFWwindow* window;
 
 #include <time.h>
-
-// Include GLM
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-using namespace glm;
-
-#include "common/shader.hpp"
-#include "common/texture.hpp"
 
 #define WIDTH 1024
 #define HEIGHT 768
@@ -43,6 +56,10 @@ int main( void ) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+#if defined(__APPLE__) || defined(MACOSX)
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
 
   // Open a window and create its OpenGL context
   window = glfwCreateWindow( WIDTH, HEIGHT, "Langrange", NULL, NULL);
