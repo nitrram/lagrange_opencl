@@ -24,9 +24,18 @@ float langrage_y(float var, __global float4 *ar, int density) {
 
 uchar4 dist_colors(int z) {
   char r = 0, g = 0, b=0;
-  float c = 12.5f; /*coefficient belonging to a colour 10 / 4*/
-  int z1 = z + 12;
-  
+  //float c = 12.5f; /*coefficient belonging to a colour 10 / 4*/
+//  int z1 = z + 12;
+
+  char m = 0xff;
+
+  int cond = z > 75;
+
+  r = (z & ~m) | (-(z > 75) & m);
+  g = (z & ~m) | (-(z > 12) & m);
+  b = (z & ~m) | (-(z < 75) & m);
+
+ /*
   if(z1 < c){
     b=(char)z1;
   }
@@ -45,8 +54,9 @@ uchar4 dist_colors(int z) {
     r = 255;  
     g-=((char)z1-5*c);
   } 
-  
-  return (uchar4)(r, g, b, 0);
+  */
+
+  return ((uchar4)(r, g, b, 0) - (uchar4)(z*0.64, z*0.85, z*0.41, 0));
 }
 
 float langrage_x(float var, __global float4 *ar, int density) {
