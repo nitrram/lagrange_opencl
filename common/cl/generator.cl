@@ -1,6 +1,6 @@
 /* __constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE |CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST; */
 
-float langrage_y(float var, __global float4 *ar, int density) {
+float lagrange_y(float var, __global float4 *ar, int density) {
 
   int i,j;
   float li = 1;
@@ -24,18 +24,16 @@ float langrage_y(float var, __global float4 *ar, int density) {
 
 uchar4 dist_colors(int z) {
   char r = 0, g = 0, b=0;
-  //float c = 12.5f; /*coefficient belonging to a colour 10 / 4*/
-//  int z1 = z + 12;
+  float c = 12.5f; /*coefficient belonging to a colour 10 / 4*/
+  int z1 = z + 12;
 
   char m = 0xff;
-
-  int cond = z > 75;
 
   r = (z & ~m) | (-(z > 75) & m);
   g = (z & ~m) | (-(z > 12) & m);
   b = (z & ~m) | (-(z < 75) & m);
 
- /*
+  /*
   if(z1 < c){
     b=(char)z1;
   }
@@ -59,7 +57,7 @@ uchar4 dist_colors(int z) {
   return ((uchar4)(r, g, b, 0) - (uchar4)(z*0.64, z*0.85, z*0.41, 0));
 }
 
-float langrage_x(float var, __global float4 *ar, int density) {
+float lagrange_x(float var, __global float4 *ar, int density) {
 
   int i,j;
   float li = 1;
@@ -90,7 +88,7 @@ __kernel void dim_x(__global float4 *src_buf,
   for(int idx=0; idx<dens; idx++) {
     dst_buf[offset+idx] = (float4)((float)x,
 				   src_buf[idx*dens].y,
-				   langrage_x((float)x, src_buf+(idx*dens), dens),
+				   lagrange_x((float)x, src_buf+(idx*dens), dens),
 				   0.0);
   }
 }
@@ -104,7 +102,7 @@ __kernel void dim_xy(__global float4 *lang_x_buf,
 
   int siz = get_global_size(0);
     
-  int z = (int)langrage_y(y, lang_x_buf+(x*dens), dens);
+  int z = (int)lagrange_y(y, lang_x_buf+(x*dens), dens);
        
   /* z ~ [R|G|B] */
 
@@ -114,4 +112,37 @@ __kernel void dim_xy(__global float4 *lang_x_buf,
   
   dst_buf[oi] = dist_colors(z); //(uchar4)(0,0,r,0);
 }
+
+__kernel
+void lagr(
+	__global float4 *net_buf,
+	__global float4 *tmp_buf,
+	__global uchar4 *dst_buf
+) {
+
+	int x = get_global_id(0);
+	int y = get_global_id(1);
+
+	int dens = get_local_size(0); //can be the other dimense also
+	int idx = get_local_id(0);
+
+	int roff = x * dens;
+	int poff = idx * dens;
+
+	tmp_buf[idx * roff] = (float4)(
+		(float)x,
+		net_buf[poff].y,
+		lagrange_x((float)x, net_buf+poff, dens),
+		0.0
+	);
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	int z = (int)lagrange_y(y, tmp_buf+roff, dens);
+
+	int c_idx = x + (y * get_global_size(0));
+	
+	dst_buf[c_idx] = dist_colors(z);
+}
+
 
