@@ -2,12 +2,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+
+/*OpenCL*/
+
+#pragma OPENCL CL_KHR_gl_sharing
+
+
 #include <CL/cl.h>
 #include <CL/cl_gl.h>
+#include <CL/cl_egl.h>
+
+/*OpenGL*/
 #include <GL/glew.h>
 #include <GL/glx.h>
 #include <GL/gl.h>
 #include <GL/freeglut.h>
+
+/*EGL*/
+#include <EGL/egl.h>
 
 #include <GLFW/glfw3.h>
 
@@ -39,23 +51,34 @@ static device_platform_t create_device() {
     fprintf(stderr, "Cannot get  platform ids.\n");
     exit(EXIT_FAILURE);
   }
- 
+
+  cl_platform_id platform = platforms[0];
+
+
+  char *platform_name;
+  size_t platform_name_size;
+  clGetPlatformInfo(platform, CL_PLATFORM_NAME, 0, NULL, &platform_name_size);
+  clGetPlatformInfo(platform, CL_PLATFORM_NAME, platform_name_size, platform_name, NULL);
+  printf("\033[0;32mPlatform name:\033[0;0m [%d]%s\n", platform_name_size, platform_name);
+
+
   cl_uint num_devices;
-  err = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_GPU, 1, NULL, &num_devices);
+  err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, NULL, &num_devices);
   if(err != CL_SUCCESS) {
     fprintf(stderr, "Cannot find any GPU device.\n");
     exit(EXIT_FAILURE);
   }
-    
+
   printf("Num of devices: %d\n", num_devices);
-  
+
   cl_device_id device;
-  err = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_GPU, 1, &device, NULL);
+  err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, NULL);
   if(err < 0) {
-    err = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_CPU, 1, &device, NULL);
+    fprintf(stderr, "\033[0;31mCould not find andy GPU specific device - falling back to CPU\033[0;0m");
+    err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_CPU, 1, &device, NULL);
   }
 
-  return device_platform_t{device, platforms[0]};  
+  return device_platform_t{device, platform};
 }
 
 static cl_program build_program(cl_context context, cl_device_id device, const char *path) {
@@ -64,7 +87,7 @@ static cl_program build_program(cl_context context, cl_device_id device, const c
   char *program_buffer, *program_log;
   size_t program_size, log_size;
   cl_int err;
-  
+
   program_handle = fopen(path, "r");
   fseek(program_handle, 0, SEEK_END);
   program_size = ftell(program_handle);
@@ -86,14 +109,14 @@ static cl_program build_program(cl_context context, cl_device_id device, const c
   if(err < 0) {
     /* Find size of log and print to std output */
     clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG,
-			  0, NULL, &log_size);
+        0, NULL, &log_size);
     program_log = (char*) malloc(log_size + 1);
     program_log[log_size] = '\0';
     clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG,
-			  log_size + 1, program_log, NULL);
+        log_size + 1, program_log, NULL);
     printf("%s\n", program_log);
-    free(program_log);  
-  }    
+    free(program_log);
+  }
 
   free(program_buffer);
   return program;
@@ -102,12 +125,12 @@ static cl_program build_program(cl_context context, cl_device_id device, const c
 static float *generate_net(size_t wdth){
 
   size_t net_len = 4 *DATA_DENSITY*DATA_DENSITY;
-  
+
   float *output = (float *)malloc(sizeof(float) * net_len + 1);
   uint32_t x,y,n;
   int i;
 
-  srand((unsigned)time(0));      
+  srand((unsigned)time(0));
   n = wdth / DATA_DENSITY;
 
   //printf("gen_net: %d [%d] ~ %d (%d)\n", n, i, x, sizeof(uint32_t) * 4 * DATA_DENSITY * DATA_DENSITY + 1);
@@ -115,9 +138,9 @@ static float *generate_net(size_t wdth){
     output[i] = (float)(x % wdth);       /* x */
     if(output[i] == 0) {
       if(i != 0) {
-	printf("\n");
-	y+=n;      
-      } 
+  printf("\n");
+  y+=n;
+      }
     }
     output[i+1] = (float)y;            /* y */
     output[i+2] = (float)((rand() % 200)); // << ((rand() % 2) ? 1 : 0));  /* z */
@@ -125,7 +148,7 @@ static float *generate_net(size_t wdth){
     printf("[%3d %3d %4.1f] ", x%wdth, y, output[i+2]);
   }
   printf("\n");
-  
+
   return output;
 }
 
@@ -142,7 +165,7 @@ static cl_mem configure_shared_data(cl_context context, GLuint &pbo, size_t size
   glGenBuffers(1, &pbo);
   glBindBuffer(GL_ARRAY_BUFFER, pbo);
   glBufferData(GL_ARRAY_BUFFER, size*sizeof(unsigned char), NULL, GL_DYNAMIC_DRAW);
-    
+
   cl_mem result = clCreateFromGLBuffer(context, CL_MEM_WRITE_ONLY, pbo, &err);
   if( err < 0 ){
     fprintf(stderr, "Could not create pixel buffer\n");
@@ -175,35 +198,35 @@ static cl_mem _net_buf;
 static cl_mem _dim_x_buf;
 static cl_mem _pixel_buf;
 
-static int _wdth;
-static int _hght;
-  
+static size_t _wdth;
+static size_t _hght;
+
 
 void update_texture() {
-  
+
   cl_int err;
   cl_event dim_xy_event, dim_x_event;
 
   size_t wrk_units[] = { _wdth, _hght };
-  size_t wrk_unit_wdth = (size_t)_wdth;
-    
+  size_t wrk_unit_wdth = _wdth;
+
   float *net_modified = (float *)clEnqueueMapBuffer(_queue, _net_buf, CL_TRUE, CL_MAP_WRITE, 0, _net_len*4, 0, NULL, NULL, &err);
 
-  for(int i = 0; i < _net_len; i+=4) {    
-    net_modified[i+2] += (float)((rand() % 10) * ((rand() % 2) ? 1 : -1));   
+  for(int i = 0; i < _net_len; i+=4) {
+    net_modified[i+2] += (float)((rand() % 10) * ((rand() % 2) ? 1 : -1));
   }
-  
+
   err = clEnqueueUnmapMemObject(_queue, _net_buf, net_modified, 0, NULL, NULL);
   if(err < 0) {
-    fprintf(stderr, "Could not unmap buffer: %d\n", err);    
+    fprintf(stderr, "Could not unmap buffer: %d\n", err);
   }
 
   clEnqueueBarrier(_queue);
 
-  clSetKernelArg(_dim_x_kernel, 0, sizeof(cl_mem), &_net_buf);  
+  clSetKernelArg(_dim_x_kernel, 0, sizeof(cl_mem), &_net_buf);
   err = clEnqueueNDRangeKernel(_queue, _dim_x_kernel, 1, NULL, &wrk_unit_wdth, NULL, 0, NULL, &dim_x_event);
   if( err < 0 ) {
-    fprintf(stderr, "Could not enqueue kernel dim1: %d\n", err);    
+    fprintf(stderr, "Could not enqueue kernel dim1: %d\n", err);
   }
 
   // clEnqueueBarrier(_queue);
@@ -211,8 +234,8 @@ void update_texture() {
   // //  printf("testing reading buffer of size: %d\n", _dim_x_siz);
   // err =  clEnqueueReadBuffer(_queue, _dim_x_buf, CL_TRUE, 0, _dim_x_siz, test, 1, &dim_x_event, NULL);
   // if(err < 0) {
-  //   fprintf(stderr, "Could not enqueue reading inter: %d\n", err);    
-  // }  
+  //   fprintf(stderr, "Could not enqueue reading inter: %d\n", err);
+  // }
   // //  printf("carry %d\n", clEnqueueBarrier(_queue));
   // for(int i=0; i<48 ; i+=4) {
   //   printf("%7.1f ", test[i+2]);
@@ -226,7 +249,7 @@ void update_texture() {
 
 
   glFinish();
-  
+
   err = clEnqueueAcquireGLObjects(_queue, 1, &_pixel_buf, 0, NULL, NULL);
   if( err < 0 ) {
      fprintf(stderr, "Could not acquire GL objects\n");
@@ -237,7 +260,7 @@ void update_texture() {
   clSetKernelArg(_dim_xy_kernel, 0, sizeof(cl_mem), &_dim_x_buf);
   err = clEnqueueNDRangeKernel(_queue, _dim_xy_kernel, 2, NULL, wrk_units, NULL, 0, NULL, &dim_xy_event);
   if( err < 0 ) {
-    fprintf(stderr, "Could not enqueue kernel: %d\n", err);    
+    fprintf(stderr, "Could not enqueue kernel: %d\n", err);
   }
 
   err = clWaitForEvents(1, &dim_xy_event);
@@ -250,8 +273,8 @@ void update_texture() {
   // printf("testing reading buffer of size: %d\n", _size);
   // err =  clEnqueueReadBuffer(_queue, _pixel_buf, CL_TRUE, 0, _size, test, 0, NULL, NULL);
   // if(err < 0) {
-  //   fprintf(stderr, "Could not enqueue reading inter: %d\n", err);    
-  // }  
+  //   fprintf(stderr, "Could not enqueue reading inter: %d\n", err);
+  // }
   // //  printf("carry %d\n", clEnqueueBarrier(_queue));
   // for(int i=10024; i<10024+48 ; i+=4) {
   //   printf("[%3d %3d %3d]\n", test[i], test[i+1], test[i+2]);
@@ -273,7 +296,7 @@ void update_texture() {
   glActiveTexture(GL_TEXTURE0);
 }
 
-void free_texture() {  
+void free_texture() {
   clReleaseMemObject(_dim_x_buf);
   clReleaseMemObject(_pixel_buf);
   clReleaseKernel(_dim_xy_kernel);
@@ -293,65 +316,102 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
 
   device_platform_t dev_plat = create_device();
 
-  _device = dev_plat.device;  
+  _device = dev_plat.device;
+
+
+  if(!eglGetCurrentContext()) {
+    fprintf(stderr, "\033[0;35mNo current EGL context available \033[0;0m\n");
+  }
+
+  if(!eglGetCurrentDisplay()) {
+    fprintf(stderr, "\033[0;35mNo current EGL display available \033[0;0m\n");
+  }
+
+  if(!glXGetCurrentContext()) {
+    fprintf(stderr, "\033[0;35mNo current GLX context available \033[0;0m\n");
+  }
+
+  if(!glXGetCurrentDisplay()) {
+    fprintf(stderr, "\033[0;35mNo current GLX display available \033[0;0m\n");
+  }
+
+
+  if( glXIsDirect(glXGetCurrentDisplay(), glXGetCurrentContext()) ) {
+    fprintf(stderr, "\033[0;31mGLX context is direct rendering \033[0;0m\n");
+  }
+
+
 
   cl_context_properties context_properties[] = {
     CL_GL_CONTEXT_KHR, (cl_context_properties) glXGetCurrentContext(),
     CL_GLX_DISPLAY_KHR, (cl_context_properties) glXGetCurrentDisplay(),
     CL_CONTEXT_PLATFORM, (cl_context_properties) dev_plat.platform,
     0};
-  
+
+
+  /*
+
+  cl_context_properties context_properties[] = {
+    CL_GL_CONTEXT_KHR, (cl_context_properties) eglGetCurrentContext(),
+    CL_EGL_DISPLAY_KHR, (cl_context_properties) eglGetCurrentDisplay(),
+    CL_CONTEXT_PLATFORM, (cl_context_properties) dev_plat.platform,
+    0};
+
+  */
+
+  //  glXMakeCurrent(NULL, NULL, NULL);
+  // -1000    CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR    clGetGLContextInfoKHR, clCreateContext    CL and GL not on the same device (only when using a GPU).
   _context = clCreateContext(context_properties, 1, &_device, NULL, NULL, &err);
   if( err < 0 ) {
-    fprintf(stderr, "Could not create context\n");
+    fprintf(stderr, "Could not create context [%d]\n", err);
   }
 
   _net = generate_net(wdth);
 
 
   srand((unsigned)time(0));
-  
-  _program = build_program(_context, _device, _path);  
-      
+
+  _program = build_program(_context, _device, _path);
+
   _size_r = wdth*hght;
   _size = _size_r*4;
 
   _dens_arg = DATA_DENSITY;
   _dim_x_siz = sizeof(float) * 4 * DATA_DENSITY * wdth;
   _dim_x = (float*)malloc(_dim_x_siz);
-  _dim_x_buf = clCreateBuffer(_context, CL_MEM_READ_WRITE, _dim_x_siz, _dim_x, &err);
+  _dim_x_buf = clCreateBuffer(_context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, _dim_x_siz, _dim_x, &err);
   if( err < 0 ) {
-    fprintf(stderr, "Could not create buffer of the tmp_buf\n");
+    fprintf(stderr, "Could not create buffer of the tmp_buf [%d]\n", err);
   }
-  
+
   _dim_x_kernel = clCreateKernel(_program, "dim_x", &err);
   if( err < 0 ) {
-    fprintf(stderr, "Could not create kernel dim1\n");
+    fprintf(stderr, "Could not create kernel dim1 [%d]\n", err);
   }
 
   _net_buf = clCreateBuffer(_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-			    _net_len * sizeof(float), _net, &err);
+          _net_len * sizeof(float), _net, &err);
   if( err < 0 ) {
-    fprintf(stderr, "Could not create buffer of the net\n");
-  } 
+    fprintf(stderr, "Could not create buffer of the net [%d]\n", err);
+  }
   clSetKernelArg(_dim_x_kernel, 0, sizeof(cl_mem), &_net_buf);
   clSetKernelArg(_dim_x_kernel, 1, sizeof(cl_mem), &_dim_x_buf);
   clSetKernelArg(_dim_x_kernel, 2, sizeof(unsigned int), &_dens_arg);
-    
+
   _dim_xy_kernel = clCreateKernel(_program, "dim_xy", &err);
   if( err < 0 ) {
-    fprintf(stderr, "Could not create kernel\n");
+    fprintf(stderr, "Could not create kernel [%d]\n", err);
   }
-  
-  _pixel_buf = configure_shared_data(_context, _pixel_gl, _size);   
-  clSetKernelArg(_dim_xy_kernel, 0, sizeof(cl_mem), &_dim_x_buf);    
-  clSetKernelArg(_dim_xy_kernel, 1, sizeof(cl_mem), &_pixel_buf);
-  clSetKernelArg(_dim_xy_kernel, 2, sizeof(unsigned int), &_dens_arg);  
 
-  
+  _pixel_buf = configure_shared_data(_context, _pixel_gl, _size);
+  clSetKernelArg(_dim_xy_kernel, 0, sizeof(cl_mem), &_dim_x_buf);
+  clSetKernelArg(_dim_xy_kernel, 1, sizeof(cl_mem), &_pixel_buf);
+  clSetKernelArg(_dim_xy_kernel, 2, sizeof(unsigned int), &_dens_arg);
+
+
   _queue = clCreateCommandQueue(_context, _device, 0, &err);
   if( err < 0 ) {
-    fprintf(stderr, "Could not create queue\n");
+    fprintf(stderr, "Could not create queue [%d]\n", err);
   }
   printf("tmp_x: %d\n", (int)_dim_x_siz);
 
@@ -359,24 +419,24 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
 
   err = clEnqueueAcquireGLObjects(_queue, 1, &_pixel_buf, 0, NULL, NULL);
   if( err < 0 ) {
-    fprintf(stderr, "Could not acquire GL objects\n");
+    fprintf(stderr, "Could not acquire GL objects [%d]\n", err);
   }
   printf("[WxH]%dx%d\n", wdth, hght);
-  
-  cl_event dim_xy_event, dim_x_event;  
-  size_t wrk_units[] = { wdth, hght };  
+
+  cl_event dim_xy_event, dim_x_event;
+  size_t wrk_units[] = { wdth, hght };
   size_t wrk_unit_wdth = (size_t)wdth;
-  
+
   err = clEnqueueNDRangeKernel(_queue, _dim_x_kernel, 1, NULL, &wrk_unit_wdth, NULL, 0, NULL, &dim_x_event);
   if( err < 0 ) {
-    fprintf(stderr, "Could not enqueue kernel dim1: %d\n", err);    
+    fprintf(stderr, "Could not enqueue kernel dim1: %d\n", err);
   }
 
   // float* test = (float*)malloc(tmp_siz);
   // printf("testing reading buffer of size: %d\n", tmp_siz);
   // err =  clEnqueueReadBuffer(queue, tmp_buf, CL_TRUE, 0, tmp_siz, test, 0, NULL, NULL);
   // if(err < 0) {
-  //     fprintf(stderr, "Could not enqueue reading inter: %d\n", err);    
+  //     fprintf(stderr, "Could not enqueue reading inter: %d\n", err);
   // }
   // printf("carry %d\n", clEnqueueBarrier(queue));
   // for(int i=0; i< 32; i+=4) {
@@ -384,12 +444,12 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   // }
   // printf("\n");
 
-      
+
   err = clEnqueueNDRangeKernel(_queue, _dim_xy_kernel, 2, NULL, wrk_units, NULL, 1, &dim_x_event, &dim_xy_event);
   if( err < 0 ) {
-     fprintf(stderr, "Could not enqueue kernel: %d\n", err);    
+     fprintf(stderr, "Could not enqueue kernel: %d\n", err);
   }
-  
+
   err = clWaitForEvents(1, &dim_xy_event);
   if( err < 0 ) {
     fprintf(stderr, "Could not wait for events\n");
@@ -408,17 +468,15 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
 
   GLuint textureID;
   glGenTextures(1, &textureID);
-    
+
   // ... nice trilinear filtering.
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
   glGenerateMipmap(GL_TEXTURE_2D);
 
 
   // Return the ID of the texture we just created
   return textureID;
 }
-
-
