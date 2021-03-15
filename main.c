@@ -14,12 +14,12 @@ GLFWwindow* window;
 #include <time.h>
 
 // Include GLM
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-using namespace glm;
+//#include <glm/glm.hpp>
+//#include <glm/gtc/matrix_transform.hpp>
+//using namespace glm;
 
-#include "common/shader.hpp"
-#include "common/texture.hpp"
+#include "common/shader.h"
+#include "common/texture.h"
 
 #define WIDTH 1024
 #define HEIGHT 768
@@ -54,7 +54,7 @@ int main( void ) {
   glfwMakeContextCurrent(window);
 
   // Initialize GLEW
-  glewExperimental = true; // Needed for core profile
+  glewExperimental = 1; //true; // Needed for core profile
   if (glewInit() != GLEW_OK) {
     fprintf(stderr, "Failed to initialize GLEW\n");
     return -1;
@@ -114,7 +114,7 @@ int main( void ) {
   glLinkProgram(programID);
   glUseProgram(programID);
 
-  generate_texture(800,700);
+  generate_texture(WIDTH, HEIGHT);
 
   double time_now;
   double time_diff;
@@ -130,7 +130,8 @@ int main( void ) {
     glfwSwapBuffers(window);
 
     time_diff = now_ms() - time_now;
-    printf("fps: %.2f\n", (float)1000/time_diff);
+    printf("\rfps: %.2f", (float)1000/time_diff);
+		fflush(stdout);
 
     glfwPollEvents();
   } // Check if the ESC key was pressed or the window was closed
@@ -139,6 +140,8 @@ int main( void ) {
    glfwWindowShouldClose(window) == 0 );
 
 
+	printf("\n");
+	
   free_texture();
 
   glDisableVertexAttribArray(0);

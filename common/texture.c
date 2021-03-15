@@ -78,7 +78,7 @@ static device_platform_t create_device() {
     err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_CPU, 1, &device, NULL);
   }
 
-  return device_platform_t{device, platform};
+  return (device_platform_t){device, platform};
 }
 
 static cl_program build_program(cl_context context, cl_device_id device, const char *path) {
@@ -97,7 +97,7 @@ static cl_program build_program(cl_context context, cl_device_id device, const c
   fread(program_buffer, sizeof(char), program_size, program_handle);
   fclose(program_handle);
 
-  printf("program size: %d\n", program_size);
+  printf("program size: %d [bytes]\n", program_size);
 
   cl_program program;
   program = clCreateProgramWithSource(context, 1, (const char **)&program_buffer, &program_size, &err);
@@ -158,15 +158,15 @@ static double now_ms() {
   return 1000.0*res.tv_sec + (double)res.tv_nsec/1e6;
 }
 
-static cl_mem configure_shared_data(cl_context context, GLuint &pbo, size_t size) {
+static cl_mem configure_shared_data(cl_context context, GLuint *pbo, size_t size) {
 
   int err;
 
-  glGenBuffers(1, &pbo);
-  glBindBuffer(GL_ARRAY_BUFFER, pbo);
+  glGenBuffers(1, pbo);
+  glBindBuffer(GL_ARRAY_BUFFER, *pbo);
   glBufferData(GL_ARRAY_BUFFER, size*sizeof(unsigned char), NULL, GL_DYNAMIC_DRAW);
 
-  cl_mem result = clCreateFromGLBuffer(context, CL_MEM_WRITE_ONLY, pbo, &err);
+  cl_mem result = clCreateFromGLBuffer(context, CL_MEM_WRITE_ONLY, *pbo, &err);
   if( err < 0 ){
     fprintf(stderr, "Could not create pixel buffer\n");
   }
@@ -403,7 +403,7 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
     fprintf(stderr, "Could not create kernel [%d]\n", err);
   }
 
-  _pixel_buf = configure_shared_data(_context, _pixel_gl, _size);
+  _pixel_buf = configure_shared_data(_context, &_pixel_gl, _size);
   clSetKernelArg(_dim_xy_kernel, 0, sizeof(cl_mem), &_dim_x_buf);
   clSetKernelArg(_dim_xy_kernel, 1, sizeof(cl_mem), &_pixel_buf);
   clSetKernelArg(_dim_xy_kernel, 2, sizeof(unsigned int), &_dens_arg);
@@ -413,7 +413,7 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   if( err < 0 ) {
     fprintf(stderr, "Could not create queue [%d]\n", err);
   }
-  printf("tmp_x: %d\n", (int)_dim_x_siz);
+	//  printf("tmp_x: %d\n", (int)_dim_x_siz);
 
   glFinish();
 
