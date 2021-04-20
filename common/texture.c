@@ -25,9 +25,10 @@
 
 #include <time.h>
 
+#include "cl_prog.h"
+
 #define DATA_DENSITY 8
 
-static const char *_path = "common/cl/generator.cl";
 
 typedef struct {
   cl_device_id device;
@@ -81,26 +82,16 @@ static device_platform_t create_device() {
   return (device_platform_t){device, platform};
 }
 
-static cl_program build_program(cl_context context, cl_device_id device, const char *path) {
+static cl_program build_program_inline(cl_context context, cl_device_id device, const char *source, size_t source_len) {
 
-  FILE* program_handle;
-  char *program_buffer, *program_log;
-  size_t program_size, log_size;
+  char *program_log;
+  size_t log_size;
   cl_int err;
 
-  program_handle = fopen(path, "r");
-  fseek(program_handle, 0, SEEK_END);
-  program_size = ftell(program_handle);
-  rewind(program_handle);
-  program_buffer = (char *)malloc(program_size + 1);
-  program_buffer[program_size] = '\0';
-  fread(program_buffer, sizeof(char), program_size, program_handle);
-  fclose(program_handle);
-
-  printf("program size: %d [bytes]\n", program_size);
+  printf("program size: %d [bytes]\n", source_len);
 
   cl_program program;
-  program = clCreateProgramWithSource(context, 1, (const char **)&program_buffer, &program_size, &err);
+  program = clCreateProgramWithSource(context, 1, (const char **)&source, &source_len, &err);
   if(err < 0) {
     fprintf(stderr, "error creating program from source: %d", err);
   }
@@ -118,7 +109,6 @@ static cl_program build_program(cl_context context, cl_device_id device, const c
     free(program_log);
   }
 
-  free(program_buffer);
   return program;
 }
 
@@ -228,19 +218,6 @@ void update_texture() {
   if( err < 0 ) {
     fprintf(stderr, "Could not enqueue kernel dim1: %d\n", err);
   }
-
-  // clEnqueueBarrier(_queue);
-  // float* test = (float*)malloc(_dim_x_siz);
-  // //  printf("testing reading buffer of size: %d\n", _dim_x_siz);
-  // err =  clEnqueueReadBuffer(_queue, _dim_x_buf, CL_TRUE, 0, _dim_x_siz, test, 1, &dim_x_event, NULL);
-  // if(err < 0) {
-  //   fprintf(stderr, "Could not enqueue reading inter: %d\n", err);
-  // }
-  // //  printf("carry %d\n", clEnqueueBarrier(_queue));
-  // for(int i=0; i<48 ; i+=4) {
-  //   printf("%7.1f ", test[i+2]);
-  // }
-  // printf("\n");
 
   err = clWaitForEvents(1, &dim_x_event);
   if( err < 0 ) {
@@ -371,7 +348,7 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
 
   srand((unsigned)time(0));
 
-  _program = build_program(_context, _device, _path);
+  _program = build_program_inline(_context, _device, (const char *)opencl_program_source, opencl_program_source_len);
 
   _size_r = wdth*hght;
   _size = _size_r*4;

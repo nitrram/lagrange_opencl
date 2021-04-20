@@ -1,6 +1,6 @@
 /* __constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE |CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST; */
 
-float langrage_y(float var, __global float4 *ar, int density) {
+float lagrange_y(float var, __global float4 *ar, int density) {
 
   int i,j;
   float li = 1;
@@ -9,7 +9,7 @@ float langrage_y(float var, __global float4 *ar, int density) {
   for(i=0; i<density; i++){
     for(j=0; j<density; j++){
       if(i!=j){
-	li *= (var - ar[j].y) / (ar[i].y - ar[j].y);
+				li *= (var - ar[j].y) / (ar[i].y - ar[j].y);
       }
     }
     ln += li*ar[i].z;
@@ -49,7 +49,7 @@ uchar4 dist_colors(int z) {
   return (uchar4)(r, g, b, 0);
 }
 
-float langrage_x(float var, __global float4 *ar, int density) {
+float lagrange_x(float var, __global float4 *ar, int density) {
 
   int i,j;
   float li = 1;
@@ -58,7 +58,7 @@ float langrage_x(float var, __global float4 *ar, int density) {
   for(i=0; i<density; i++){
     for(j=0; j<density; j++){
       if(i!=j){
-  	  li *= (var - ar[j].x) / (ar[i].x - ar[j].x);
+				li *= (var - ar[j].x) / (ar[i].x - ar[j].x);
       }
     }
     ln += li*ar[i].z;    
@@ -69,39 +69,38 @@ float langrage_x(float var, __global float4 *ar, int density) {
 }
 
 __kernel void dim_x(__global float4 *src_buf,
-		    __global float4 *dst_buf,
-		    int dens) {
+										__global float4 *dst_buf,
+										int dens) {
   
   int x = get_global_id(0);
-  
-  int siz = get_global_size(0);
-  
+    
   int offset = x * dens;
   for(int idx=0; idx<dens; idx++) {
     dst_buf[offset+idx] = (float4)((float)x,
-				   src_buf[idx*dens].y,
-				   langrage_x((float)x, src_buf+(idx*dens), dens),
-				   0.0);
+																	 src_buf[idx*dens].y,
+																	 lagrange_x((float)x, src_buf+(idx*dens), dens),
+																	 0.0);
   }
 }
 
-__kernel void dim_xy(__global float4 *lang_x_buf,
-		     __global uchar4 *dst_buf,
-		     int dens) {
+__kernel void dim_xy(__global float4 *lagr_x_buf,
+										 __global uchar4 *dst_buf,
+										 int dens) {
 
   int x = get_global_id(0);
   int y = get_global_id(1);
 
-  int siz = get_global_size(0);
+  int stride_x = get_global_size(0);
     
-  int z = (int)langrage_y(y, lang_x_buf+(x*dens), dens);
-       
+  int z = (int)lagrange_y(y, lagr_x_buf+(x*dens), dens);
+
   /* z ~ [R|G|B] */
 
-  int oi = x + (y*siz);
+	int oi = x + (stride_x*y);
 
   //  int r = (y%8 && x%8) ? 0 : 120;
   
-  dst_buf[oi] = dist_colors(z); //(uchar4)(0,0,r,0);
+	dst_buf[oi] = dist_colors(z); //(uchar4)(0,0,r,0);
 }
+
 
