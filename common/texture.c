@@ -53,33 +53,39 @@ static device_platform_t create_device() {
     exit(EXIT_FAILURE);
   }
 
-  cl_platform_id platform = platforms[0];
-
-
+  int i = 0;
+  cl_platform_id platform;
   char *platform_name;
   size_t platform_name_size;
-  clGetPlatformInfo(platform, CL_PLATFORM_NAME, 0, NULL, &platform_name_size);
-  clGetPlatformInfo(platform, CL_PLATFORM_NAME, platform_name_size, platform_name, NULL);
-  printf("\033[0;32mPlatform name:\033[0;0m [%d]%s\n", platform_name_size, platform_name);
-
-
   cl_uint num_devices;
-  err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, NULL, &num_devices);
-  if(err != CL_SUCCESS) {
-    fprintf(stderr, "Cannot find any GPU device.\n");
-    exit(EXIT_FAILURE);
-  }
-
-  printf("Num of devices: %d\n", num_devices);
-
   cl_device_id device;
-  err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, NULL);
-  if(err < 0) {
-    fprintf(stderr, "\033[0;31mCould not find andy GPU specific device - falling back to CPU\033[0;0m");
-    err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_CPU, 1, &device, NULL);
+  while(i < num_platforms) {
+
+    platform = platforms[i++];
+
+    clGetPlatformInfo(platform, CL_PLATFORM_NAME, 0, NULL, &platform_name_size);
+    clGetPlatformInfo(platform, CL_PLATFORM_NAME, platform_name_size, platform_name, NULL);
+    printf("\033[0;32mPlatform name:\033[0;0m [%d]%s\n", platform_name_size, platform_name);
+
+    err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, NULL, &num_devices);
+    if(err != CL_SUCCESS) {
+      fprintf(stderr, "Cannot find any GPU device on the platform %s.\n", platform_name);
+      continue;
+    }
+    printf("Num of devices: %d\n", num_devices);
+
+    err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, NULL);
+    if(err < 0) {
+      fprintf(stderr, "\033[0;31mCould not find andy GPU specific device - falling back to CPU\033[0;0m");
+      continue;
+    } else {
+      return (device_platform_t){device, platform};
+    }
   }
 
-  return (device_platform_t){device, platform};
+  exit(EXIT_FAILURE);
+
+  return (device_platform_t){NULL,NULL};
 }
 
 static cl_program build_program_inline(cl_context context, cl_device_id device, const char *source, size_t source_len) {
@@ -197,6 +203,8 @@ void update_texture() {
   cl_int err;
   cl_event dim_xy_event, dim_x_event;
 
+  size_t wrk_group_enh[] = { DATA_DENSITY, DATA_DENSITY };
+  size_t wrk_units_enh[] = { _wdth*DATA_DENSITY, _hght*DATA_DENSITY };
   size_t wrk_units[] = { _wdth, _hght };
   size_t wrk_unit_wdth = _wdth;
 
@@ -390,7 +398,7 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   if( err < 0 ) {
     fprintf(stderr, "Could not create queue [%d]\n", err);
   }
-	//  printf("tmp_x: %d\n", (int)_dim_x_siz);
+  //  printf("tmp_x: %d\n", (int)_dim_x_siz);
 
   glFinish();
 
