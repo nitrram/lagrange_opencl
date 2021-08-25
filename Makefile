@@ -11,7 +11,7 @@ CFLAGS += -pedantic -Iinclude -DCL_TARGET_OPENCL_VERSION=120
 HEX := xxd
 HEADER_PREFIX := /* This is an automaticaly generated header consisting of hexadecimal ANSI C strings\n * based on $(notdir $(cl_SOURCES))\n */\n\n
 
-LIBS := EGL GLEW GL GLU glfw OpenCL
+LIBS :=  EGL GLEW GL GLU glfw OpenCL m
 
 DIRS := . common
 
@@ -33,11 +33,11 @@ OBJECTS += $(C_OBJECTS)
 
 .cpp.o:
 	@echo "cpp compilation"
-	$(CXX) $(addprefix -l,$(LIBS)) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 .c.o:
 	@echo "cc compilation"
-	$(CC) $(addprefix -l,$(LIBS)) $(CFLAGS) -c $< -o $@
+	$(CC)  $(CFLAGS) -c $< -o $@
 
 
 all: example
@@ -56,7 +56,7 @@ cl_header: common/cl_prog.h
 example: | cl_header $(OBJECTS)
 	@echo "\033[0;32mcompilation example\033[0;0m"
 	@echo $(OBJECTS)
-	$(CXX) $(addprefix -l,$(LIBS)) $(CFLAGS) $(OBJECTS) -g -o $@
+	$(CXX)  $(CXXFLAGS) $(OBJECTS)  $(addprefix -l,$(LIBS)) -g -o $@
 
 
 ###g++ -o $* ${COMMON}/shader.cpp ${COMMON}/texture.c main.c -Iinclude -lEGL -lGLEW -lGL -lGLU -lglfw -lOpenCL -lm -DCL_TARGET_OPENCL_VERSION=120
