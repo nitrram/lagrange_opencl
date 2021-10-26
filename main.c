@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <CL/cl.h>
-
 // Include GLEW
 #include <GL/glew.h>
 
@@ -21,8 +19,8 @@ GLFWwindow* window;
 #include "common/shader.h"
 #include "common/texture.h"
 
-#define WIDTH 1024
-#define HEIGHT 768
+#define WIDTH 1600
+#define HEIGHT 1600
 
 
 static double now_ms() {
@@ -114,7 +112,9 @@ int main( void ) {
   glLinkProgram(programID);
   glUseProgram(programID);
 
-  generate_texture(WIDTH, HEIGHT);
+  if(generate_texture(WIDTH, HEIGHT) == GL_INVALID_VALUE) {
+		exit(EXIT_FAILURE);
+	}
 
   double time_now;
   double time_diff;
@@ -142,7 +142,7 @@ int main( void ) {
 
 	printf("\n");
 	
-  free_texture();
+  free_texture(all);
 
   glDisableVertexAttribArray(0);
   glDisableVertexAttribArray(1);
@@ -153,8 +153,10 @@ int main( void ) {
   glDeleteTextures(1, &TextureID);
   glDeleteVertexArrays(1, &VertexArrayID);
 
+	
   // Close OpenGL window and terminate GLFW
-  glfwTerminate();
+
+	//  glfwTerminate();
 
   return 0;
 }
