@@ -43,12 +43,8 @@ GLuint LoadShaders(const char * vertex_file_path,const char * fragment_file_path
 		FragmentShaderStream.close();
 	}
 
-
-
 	GLint Result = GL_FALSE;
 	int InfoLogLength;
-
-
 
 	// Compile Vertex Shader
 	printf("Compiling shader : %s\n", vertex_file_path);

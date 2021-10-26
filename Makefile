@@ -5,7 +5,7 @@ CXX := g++
 CXXFLAGS += -Wall -fPIE
 
 CC := gcc
-CFLAGS += -pedantic -Iinclude -DCL_TARGET_OPENCL_VERSION=120
+CFLAGS += -pedantic -Iinclude -DCL_TARGET_OPENCL_VERSION=200
 
 # generating header out of opencl code
 HEX := xxd
