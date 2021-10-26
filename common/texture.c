@@ -7,7 +7,6 @@
 
 #pragma OPENCL CL_KHR_gl_sharing
 
-
 #include <CL/cl.h>
 #include <CL/cl_gl.h>
 #include <CL/cl_egl.h>
@@ -184,9 +183,9 @@ void update_texture() {
   clEnqueueReleaseGLObjects(_queue, 1, &_pixel_buf, 0, NULL, NULL);
 
   clFinish(_queue);
+	clReleaseEvent(mapping_event);
   clReleaseEvent(dim_xy_event);
   clReleaseEvent(dim_x_event);
-
 
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, _pixel_gl);
 

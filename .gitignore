@@ -1,4 +1,5 @@
 **/*.o
 example
 **/*~
+cl_prog.h
 opencl_program_source
