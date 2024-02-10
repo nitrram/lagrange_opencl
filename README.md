@@ -1,3 +1,6 @@
+![lagrange](print_screen.png)
+
+
 ## Installation requirements
  - OpenCL headers and ICD drivers
  - xxd - a hex dump utility needed by automake to inline OpenCL & OpenGL code
