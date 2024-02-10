@@ -1,5 +1,7 @@
 **/*.o
-example
+lagrange
 **/*~
 cl_prog.h
 opencl_program_source
+gl_fragment_prog.h
+gl_vertex_prog.h

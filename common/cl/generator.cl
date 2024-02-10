@@ -12,7 +12,7 @@ float lagrange_y(float var, __global float2 *ar, int density) {
         li *= (var - ar[j].x) / (ar[i].x - ar[j].x);
       }
     }
-    ln += li*ar[i].y; 
+    ln += li*ar[i].y;
     li = 1;
   }
 
@@ -24,13 +24,13 @@ float lagrange_y(float var, __global float2 *ar, int density) {
 
 uchar4 dist_colors(int z) {
 
-	float z2 = (z != 0) ? (fmin(sign((float)z) * log(fabs((float)z)), 5.94f)) : 0.0f;
+  float z2 = (z != 0) ? (fmin(sign((float)z) * log(fabs((float)z)), 5.94f)) : 0.0f;
 
   char zr = 255.0f * exp(-pow((float)z2 + 5.94f, 2.0f) / 5.0f);
   char zg = 255.0f * exp(-pow((float)z2 + 0.0f, 2.0f) / 10.0f);
-	char zb = 255.0f * exp(-pow((float)z2 - 5.94f, 2.0f) / 5.0f);
+  char zb = 255.0f * exp(-pow((float)z2 - 5.94f, 2.0f) / 5.0f);
 
-	return (uchar4)(zr, zg, zb, 0);
+  return (uchar4)(zr, zg, zb, 0);
 }
 
 float lagrange_x(float var, __global float4 *ar, int density) {
@@ -57,17 +57,17 @@ float lagrange_x(float var, __global float4 *ar, int density) {
 __kernel void dim_x(__global float4 *src_buf,
                     __global float2 *dst_buf) {
 
-	size_t g = get_group_id(0);
-	size_t dens = get_local_size(0);
-	size_t idx = get_local_id(0);
+  size_t g = get_group_id(0);
+  size_t dens = get_local_size(0);
+  size_t idx = get_local_id(0);
 
-	size_t x = g+idx;
-	size_t offset = g * dens;
-	size_t src_offset = idx * dens;
+  size_t x = g+idx;
+  size_t offset = g * dens;
+  size_t src_offset = idx * dens;
 
-	//	dens-tuplets to iterate through in the next step
-	dst_buf[idx+offset] = (float2)(src_buf[src_offset].y,
-																 lagrange_x((float)x, src_buf+(src_offset), dens));
+  //      dens-tuplets to iterate through in the next step
+  dst_buf[idx+offset] = (float2)(src_buf[src_offset].y,
+                                 lagrange_x((float)x, src_buf+(src_offset), dens));
 
 }
 

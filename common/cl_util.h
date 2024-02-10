@@ -4,9 +4,9 @@
 
 typedef struct {
 
-	cl_device_id device;
-	cl_platform_id platform;
-	
+  cl_device_id device;
+  cl_platform_id platform;
+
 } scl_device_platform_t;
 
 
@@ -18,9 +18,9 @@ typedef struct {
 scl_device_platform_t scl_get_device();
 
 cl_program scl_build_program_inline(
-		cl_context context,
-		cl_device_id device,
-		const char *source,
-		size_t source_len,
-		cl_int *err
-);
+                                    cl_context context,
+                                    cl_device_id device,
+                                    const char *source,
+                                    size_t source_len,
+                                    cl_int *err
+                                    );
