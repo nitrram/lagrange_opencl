@@ -31,11 +31,10 @@ static double now_ms() {
 
 int main( void ) {
   // Initialise GLFW
-  if( !glfwInit() )
-    {
-      fprintf( stderr, "Failed to initialize GLFW\n" );
-      return -1;
-    }
+  if( !glfwInit() ) {
+    fprintf( stderr, "Failed to initialize GLFW\n" );
+    return -1;
+  }
 
   glfwWindowHint(GLFW_SAMPLES, 4);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -61,12 +60,15 @@ int main( void ) {
   // Ensure we can capture the escape key being pressed below
   glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
 
+  // Turn off v-sync
+  glfwSwapInterval(0);
+
   GLuint VertexArrayID;
   glGenVertexArrays(1, &VertexArrayID);
   glBindVertexArray(VertexArrayID);
 
   // Create and compile our GLSL program from the shaders
-  GLuint programID = LoadShaders( "TransformVertexShader.vertexshader", "TextureFragmentShader.fragmentshader" );
+  GLuint programID = LoadShaders();
 
   // Get a handle for our "myTextureSampler" uniform
   GLuint TextureID  = glGetUniformLocation(programID, "myTextureSampler");
@@ -76,31 +78,30 @@ int main( void ) {
   static const GLfloat g_vertex_buffer_data[] = {
     -1.0f, -1.0f,
     -1.0f,  1.0f,
-     1.0f,  1.0f,
-     1.0f, -1.0f,
+    1.0f,  1.0f,
+    1.0f, -1.0f,
   };
 
   GLfloat tex_coords[] = {1.0f, 0.0f,
-        1.0f, 1.0f,
-        0.0f, 1.0f,
-        0.0f, 0.0f};
+                          1.0f, 1.0f,
+                          0.0f, 1.0f,
+                          0.0f, 0.0f};
 
   GLuint vertexbuffer[2];
   glGenBuffers(2, vertexbuffer);
   glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer[0]);
   glBufferData(GL_ARRAY_BUFFER, 8*sizeof(GLfloat), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
 
-
   // 1rst attribute buffer : vertices
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(
-      0,                  // attribute. No particular reason for 0, but must match the layout in the shader.
-      2,                  // size
-      GL_FLOAT,           // type
-      GL_FALSE,           // normalized?
-      0,                  // stride
-      (void*)0            // array buffer offset
-      );
+                        0,                  // attribute. No particular reason for 0, but must match the layout in the shader.
+                        2,                  // size
+                        GL_FLOAT,           // type
+                        GL_FALSE,           // normalized?
+                        0,                  // stride
+                        (void*)0            // array buffer offset
+                        );
 
   glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer[1]);
   glBufferData(GL_ARRAY_BUFFER, 8*sizeof(GLfloat), tex_coords, GL_DYNAMIC_DRAW);
@@ -113,8 +114,8 @@ int main( void ) {
   glUseProgram(programID);
 
   if(generate_texture(WIDTH, HEIGHT) == GL_INVALID_VALUE) {
-		exit(EXIT_FAILURE);
-	}
+    exit(EXIT_FAILURE);
+  }
 
   double time_now;
   double time_diff;
@@ -131,17 +132,17 @@ int main( void ) {
 
     time_diff = now_ms() - time_now;
     printf("\rfps: %.2f", (float)1000/time_diff);
-		fflush(stdout);
+    fflush(stdout);
 
     glfwPollEvents();
   } // Check if the ESC key was pressed or the window was closed
   while( ((glfwGetKey(window, GLFW_KEY_ESCAPE ) != GLFW_PRESS) &&
-    (glfwGetKey(window, GLFW_KEY_Q) != GLFW_PRESS)) &&
-   glfwWindowShouldClose(window) == 0 );
+          (glfwGetKey(window, GLFW_KEY_Q) != GLFW_PRESS)) &&
+         glfwWindowShouldClose(window) == 0 );
 
 
-	printf("\n");
-	
+  printf("\n");
+
   free_texture(all);
 
   glDisableVertexAttribArray(0);
@@ -153,10 +154,10 @@ int main( void ) {
   glDeleteTextures(1, &TextureID);
   glDeleteVertexArrays(1, &VertexArrayID);
 
-	
+
   // Close OpenGL window and terminate GLFW
 
-	//  glfwTerminate();
+  glfwTerminate();
 
   return 0;
 }

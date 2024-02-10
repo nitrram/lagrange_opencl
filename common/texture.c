@@ -1,7 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
 
 /*OpenCL*/
 
@@ -27,6 +24,7 @@
 #include "texture.h"
 #include "cl_util.h"
 
+/*Generated from Makefile*/
 #include "cl_prog.h"
 
 #define DATA_DENSITY 8
@@ -48,13 +46,13 @@ static float *generate_net(size_t wdth){
     output[i] = (float)(x % wdth);       /* x */
     if(output[i] == 0) {
       if(i != 0) {
-				printf("\n");
-				y+=n;
+        printf("\n");
+        y+=n;
       }
     }
     output[i+1] = (float)y;            /* y */
     output[i+2] = (float)((rand() % 200)); // << ((rand() % 2) ? 1 : 0));  /* z */
-		
+
     printf("[%3d %3d %4.1f] ", x%wdth, y, output[i+2]);
   }
   printf("\n");
@@ -118,7 +116,7 @@ void update_texture() {
 
   size_t wrk_units[] = { _wdth, _hght };
   size_t wrk_unit_wdth = _wdth * DATA_DENSITY;
-	size_t wrk_group_wdth = DATA_DENSITY;
+  size_t wrk_group_wdth = DATA_DENSITY;
 
   float *net_modified = (float *)clEnqueueMapBuffer(_queue, _net_buf, CL_TRUE, CL_MAP_WRITE, 0, _net_len*sizeof(float), 0, NULL, NULL, &err);
 
@@ -129,36 +127,36 @@ void update_texture() {
   err = clEnqueueUnmapMemObject(_queue, _net_buf, net_modified, 0, NULL, &mapping_event);
   if(err < 0) {
     fprintf(stderr, "Could not unmap buffer: %d\n", err);
-		free_texture(all);
-		return;
+    free_texture(all);
+    return;
   }
 
-	clEnqueueBarrierWithWaitList(_queue, 1 , &mapping_event, NULL);
+  clEnqueueBarrierWithWaitList(_queue, 1 , &mapping_event, NULL);
 
   clSetKernelArg(_dim_x_kernel, 0, sizeof(cl_mem), &_net_buf);
   err = clEnqueueNDRangeKernel(_queue, _dim_x_kernel, 1, NULL, &wrk_unit_wdth, &wrk_group_wdth, 0, NULL, &dim_x_event);
   if( err < 0 ) {
     fprintf(stderr, "\nCould not enqueue kernel dim1: %d (wrkUnitWdth %d)\n", err, wrk_unit_wdth);
-		if(dim_x_event) clReleaseEvent(dim_x_event);
-		free_texture(all);
-		return;
+    if(dim_x_event) clReleaseEvent(dim_x_event);
+    free_texture(all);
+    return;
   }
 
   err = clWaitForEvents(1, &dim_x_event);
   if( err < 0 ) {
     fprintf(stderr, "Could not wait for events\n");
-		if(dim_x_event) clReleaseEvent(dim_x_event);
-		free_texture(all);
-		return;
+    if(dim_x_event) clReleaseEvent(dim_x_event);
+    free_texture(all);
+    return;
   }
 
   glFinish();
 
   err = clEnqueueAcquireGLObjects(_queue, 1, &_pixel_buf, 0, NULL, NULL);
   if( err < 0 ) {
-     fprintf(stderr, "Could not acquire GL objects\n");
-		 free_texture(all);
-		 return;
+    fprintf(stderr, "Could not acquire GL objects\n");
+    free_texture(all);
+    return;
   }
 
 
@@ -167,23 +165,23 @@ void update_texture() {
   err = clEnqueueNDRangeKernel(_queue, _dim_xy_kernel, 2, NULL, wrk_units, NULL, 0, NULL, &dim_xy_event);
   if( err < 0 ) {
     fprintf(stderr, "Could not enqueue kernel: %d\n", err);
-		if(dim_xy_event) clReleaseEvent(dim_xy_event);
-		free_texture(all);
-		return;
+    if(dim_xy_event) clReleaseEvent(dim_xy_event);
+    free_texture(all);
+    return;
   }
 
   err = clWaitForEvents(1, &dim_xy_event);
   if( err < 0 ) {
     fprintf(stderr, "Could not wait for events\n");
-		if(dim_xy_event) clReleaseEvent(dim_xy_event);
-		free_texture(all);
-		return;
+    if(dim_xy_event) clReleaseEvent(dim_xy_event);
+    free_texture(all);
+    return;
   }
 
   clEnqueueReleaseGLObjects(_queue, 1, &_pixel_buf, 0, NULL, NULL);
 
   clFinish(_queue);
-	clReleaseEvent(mapping_event);
+  clReleaseEvent(mapping_event);
   clReleaseEvent(dim_xy_event);
   clReleaseEvent(dim_x_event);
 
@@ -196,26 +194,28 @@ void update_texture() {
 
 void free_texture(enum e_release type) {
 
-	switch(type) {
-	case all:
-		clReleaseMemObject(_pixel_buf);
-	case pixel:
-		clReleaseCommandQueue(_queue);
-	case queue:
-		clReleaseKernel(_dim_xy_kernel);
-	case dim_xy_kernel:
-		clReleaseMemObject(_net_buf);
-	case net:
-		clReleaseKernel(_dim_x_kernel);
-	case dim_x_kernel:
-		clReleaseMemObject(_dim_x_buf);
-	case dim_x:
-	case program:
-		if(_program) clReleaseProgram(_program);
-		clReleaseContext(_context);
-	case context:
-		(void)(0);
-	}
+  switch(type) {
+  case all:
+    clReleaseMemObject(_pixel_buf);
+  case pixel:
+    clReleaseCommandQueue(_queue);
+  case queue:
+    clReleaseKernel(_dim_xy_kernel);
+  case dim_xy_kernel:
+    clReleaseMemObject(_net_buf);
+  case net:
+    clReleaseKernel(_dim_x_kernel);
+  case dim_x_kernel:
+    clReleaseMemObject(_dim_x_buf);
+  case dim_x:
+    free(_dim_x);
+  case program:
+    if(_program) clReleaseProgram(_program);
+    clReleaseContext(_context);
+  case context:
+    (void)(0);
+  }
+  free(_net);
 }
 
 
@@ -261,8 +261,8 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   _context = clCreateContext(context_properties, 1, &_device, NULL, NULL, &err);
   if( err < 0 ) {
     fprintf(stderr, "Could not create context [%d]\n", err);
-		free_texture(context);
-		return 0;
+    free_texture(context);
+    return 0;
   }
 
   _net = generate_net(wdth);
@@ -270,11 +270,11 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   srand((unsigned)time(0));
 
   _program = scl_build_program_inline(_context, _device, (const char *)opencl_program_source, opencl_program_source_len, &err);
-	if( err < 0 ) {
-		fprintf(stderr, "Could not create OpenCL program [%d]\n", err);
-		free_texture(program);
-		return GL_INVALID_VALUE;
-	}
+  if( err < 0 ) {
+    fprintf(stderr, "Could not create OpenCL program [%d]\n", err);
+    free_texture(program);
+    return GL_INVALID_VALUE;
+  }
 
   _size_r = wdth*hght;
   _size = _size_r*4;
@@ -282,26 +282,26 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   _dens_arg = DATA_DENSITY;
   _dim_x_siz = sizeof(float) * 4 * DATA_DENSITY * wdth;
   _dim_x = (float*)malloc(_dim_x_siz);
-  _dim_x_buf = clCreateBuffer(_context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, _dim_x_siz, _dim_x, &err);
+  _dim_x_buf = clCreateBuffer(_context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, _dim_x_siz, _dim_x, &err);
   if( err < 0 ) {
     fprintf(stderr, "Could not create buffer of the tmp_buf [%d]\n", err);
-		free_texture(dim_x);
-		return GL_INVALID_VALUE;
+    free_texture(dim_x);
+    return GL_INVALID_VALUE;
   }
 
   _dim_x_kernel = clCreateKernel(_program, "dim_x", &err);
   if( err < 0 ) {
     fprintf(stderr, "Could not create kernel dim1 [%d]\n", err);
-		free_texture(dim_x_kernel);
-		return GL_INVALID_VALUE;
+    free_texture(dim_x_kernel);
+    return GL_INVALID_VALUE;
   }
 
   _net_buf = clCreateBuffer(_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-          _net_len * sizeof(float), _net, &err);
+                            _net_len * sizeof(float), _net, &err);
   if( err < 0 ) {
     fprintf(stderr, "Could not create buffer of the net [%d]\n", err);
-		free_texture(net);
-		return GL_INVALID_VALUE;
+    free_texture(net);
+    return GL_INVALID_VALUE;
   }
 
   clSetKernelArg(_dim_x_kernel, 0, sizeof(cl_mem), &_net_buf);
@@ -309,9 +309,9 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
 
   _dim_xy_kernel = clCreateKernel(_program, "dim_xy", &err);
   if( err < 0 ) {
-    fprintf(stderr, "Could not create kernel [%d]\n", err); 
-		free_texture(dim_xy_kernel);
-		return GL_INVALID_VALUE;
+    fprintf(stderr, "Could not create kernel [%d]\n", err);
+    free_texture(dim_xy_kernel);
+    return GL_INVALID_VALUE;
   }
 
   _pixel_buf = configure_shared_data(_context, &_pixel_gl, _size);
@@ -319,12 +319,12 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   clSetKernelArg(_dim_xy_kernel, 1, sizeof(cl_mem), &_pixel_buf);
   clSetKernelArg(_dim_xy_kernel, 2, sizeof(unsigned int), &_dens_arg);
 
-	cl_queue_properties queue_properties[] = { CL_QUEUE_PROPERTIES, (const cl_queue_properties) (CL_QUEUE_ON_DEVICE && CL_QUEUE_PROFILING_ENABLE), 0 };
-	_queue = clCreateCommandQueueWithProperties(_context, _device, queue_properties, &err);
+  cl_queue_properties queue_properties[] = { CL_QUEUE_PROPERTIES, (const cl_queue_properties) (CL_QUEUE_ON_DEVICE && CL_QUEUE_PROFILING_ENABLE), 0 };
+  _queue = clCreateCommandQueueWithProperties(_context, _device, queue_properties, &err);
   if( err < 0 ) {
     fprintf(stderr, "Could not create queue [%d]\n", err);
-		free_texture(queue);
-		return GL_INVALID_VALUE;
+    free_texture(queue);
+    return GL_INVALID_VALUE;
   }
   //  printf("tmp_x: %d\n", (int)_dim_x_siz);
 
@@ -333,43 +333,43 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   err = clEnqueueAcquireGLObjects(_queue, 1, &_pixel_buf, 0, NULL, NULL);
   if( err < 0 ) {
     fprintf(stderr, "Could not acquire GL objects [%d]\n", err);
-		free_texture(queue);
-		return GL_INVALID_VALUE;
+    free_texture(queue);
+    return GL_INVALID_VALUE;
   }
   printf("[WxH]%dx%d\n", _wdth, _hght);
 
   cl_event dim_xy_event = 0, dim_x_event = 0;
   size_t wrk_units[] = { _wdth, _hght };
   size_t wrk_unit_wdth = _wdth * DATA_DENSITY;
-	size_t wrk_group_wdth = DATA_DENSITY;
+  size_t wrk_group_wdth = DATA_DENSITY;
 
 
-	printf("[WuxHu]%dx%d\n", wrk_units[0], wrk_units[1]);
+  printf("[WuxHu]%dx%d\n", wrk_units[0], wrk_units[1]);
 
   err = clEnqueueNDRangeKernel(_queue, _dim_x_kernel, 1, NULL, &wrk_unit_wdth, NULL, 0, NULL, &dim_x_event);
   if( err < 0 ) {
     fprintf(stderr, "Could not enqueue kernel dim1: %d\n", err);
-		if(dim_x_event) clReleaseEvent(dim_x_event);
-		free_texture(queue);
-		return GL_INVALID_VALUE;
+    if(dim_x_event) clReleaseEvent(dim_x_event);
+    free_texture(queue);
+    return GL_INVALID_VALUE;
   }
 
   err = clEnqueueNDRangeKernel(_queue, _dim_xy_kernel, 2, NULL, wrk_units, NULL, 1, &dim_x_event, &dim_xy_event);
   if( err < 0 ) {
-     fprintf(stderr, "Could not enqueue kernel: %d\n", err);
-		 if(dim_x_event) clReleaseEvent(dim_x_event);
-		 if(dim_xy_event) clReleaseEvent(dim_xy_event);
-		 free_texture(queue);
-		 return GL_INVALID_VALUE;
+    fprintf(stderr, "Could not enqueue kernel: %d\n", err);
+    if(dim_x_event) clReleaseEvent(dim_x_event);
+    if(dim_xy_event) clReleaseEvent(dim_xy_event);
+    free_texture(queue);
+    return GL_INVALID_VALUE;
   }
 
   err = clWaitForEvents(1, &dim_xy_event);
   if( err < 0 ) {
     fprintf(stderr, "Could not wait for events\n");
-		clReleaseEvent(dim_x_event);
-		clReleaseEvent(dim_xy_event);
-		free_texture(queue);
-		return GL_INVALID_VALUE;
+    clReleaseEvent(dim_x_event);
+    clReleaseEvent(dim_xy_event);
+    free_texture(queue);
+    return GL_INVALID_VALUE;
   }
 
   clEnqueueReleaseGLObjects(_queue, 1, &_pixel_buf, 0, NULL, NULL);
@@ -394,6 +394,6 @@ GLuint generate_texture(const uint32_t wdth, const uint32_t hght) {
   glGenerateMipmap(GL_TEXTURE_2D);
 
 
-	// Return the ID of the texture we just created
+  // Return the ID of the texture we just created
   return textureID;
 }
