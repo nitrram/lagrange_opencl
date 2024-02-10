@@ -3,6 +3,7 @@
 
 ## Installation requirements
  - OpenCL headers and ICD drivers
+ - glfw and glew - for OpenGL window and input handling
  - xxd - a hex dump utility needed by automake to inline OpenCL & OpenGL code
  - automake utilities
  - gcc/g++
